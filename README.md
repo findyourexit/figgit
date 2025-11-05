@@ -23,12 +23,14 @@ A Figma plugin that extracts design variables (colors, typography, spacing, etc.
 - 
 ## Quick Installation
 
-1. **Extract this ZIP file** to a folder on your computer (remember where you put it!)
-2. **Open Figma Desktop** (download from <https://www.figma.com/downloads/> if you don't have it)
-3. In Figma, go to **Menu** → **Plugins** → **Development** → **Import plugin from manifest...**
-4. Navigate to the folder where you extracted these files
-5. Select `manifest.json`
-6. Done! The plugin will appear under **Plugins** → **Development** → **FigGit**
+1. **Get the latest build**: Navigate to the `release` folder in this repository and find the latest ZIP file.
+2. **Extract the ZIP file** to a folder on your computer (remember where you put it!).
+3. **Open Figma Desktop** (download from <https://www.figma.com/downloads/> if you don't have it).
+4. In Figma, go to **Menu** → **Plugins** → **Development** → **Import plugin from manifest...**
+5. Navigate to the folder where you extracted the files from the ZIP.
+6. Select `manifest.json`.
+7. Done! The plugin will appear under **Plugins** → **Development** and you’ll see it listed there.
+
 
 > [!TIP]
 > When using the plugin, you'll be given an opportunity to save your input settings, using the "Save Settings" button - this is highly recommended, as it'll make your life easier for the next time you're exporting Figma design tokens!
