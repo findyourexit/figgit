@@ -1,0 +1,92 @@
+{
+  "name": "figgit",
+  "version": "0.1.0",
+  "description": "A Figma plugin to export all local variables to a GitHub repository as JSON with smart change detection.",
+  "author": "Tom Larcher <tom.larcher@gmail.com>",
+  "license": "MIT",
+  "keywords": [
+    "figma",
+    "figma-plugin",
+    "design-tokens",
+    "variables",
+    "github",
+    "automation",
+    "design-system",
+    "typescript",
+    "react"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/findyourexit/figgit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/findyourexit/figgit/issues"
+  },
+  "homepage": "https://github.com/findyourexit/figgit#readme",
+  "scripts": {
+    "clean": "rm -rf dist",
+    "dev": "concurrently \"npm run dev:ui\" \"npm run dev:plugin\"",
+    "dev:ui": "vite",
+    "dev:plugin": "tsc --watch --project tsconfig.plugin.json",
+    "build": "npm run build:plugin && npm run build:ui",
+    "build:plugin": "esbuild src/plugin.ts --bundle --outfile=dist/plugin.js --platform=browser --target=es2017",
+    "build:ui": "vite build",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
+    "test:determinism": "tsx scripts/test-determinism.ts",
+    "type-check": "tsc --noEmit",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@axe-core/react": "^4.11.0",
+    "@figma/eslint-plugin-figma-plugins": "^0.16.1",
+    "@figma/plugin-typings": "1.103.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^24.10.0",
+    "@types/react": "18.2.21",
+    "@types/react-dom": "18.2.7",
+    "@typescript-eslint/eslint-plugin": "^8.46.3",
+    "@typescript-eslint/parser": "^8.46.3",
+    "@vitejs/plugin-react": "^5.1.0",
+    "@vitest/coverage-v8": "^4.0.7",
+    "@vitest/ui": "^4.0.7",
+    "concurrently": "^9.2.1",
+    "esbuild": "0.21.5",
+    "eslint": "^8.57.1",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "husky": "^9.1.7",
+    "jsdom": "^27.1.0",
+    "lint-staged": "^16.2.6",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.6",
+    "typescript": "5.4.5",
+    "vite": "^7.1.12",
+    "vite-plugin-singlefile": "^2.3.0",
+    "vitest": "^4.0.7"
+  },
+  "dependencies": {
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "lint-staged": {
+    "src/**/*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "tests/**/*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.css": [
+      "prettier --write"
+    ]
+  }
+}

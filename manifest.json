@@ -1,0 +1,16 @@
+{
+  "name": "FigGit",
+  "id": "1234567890123456789",
+  "api": "1.0.0",
+  "main": "dist/plugin.js",
+  "ui": "dist/ui.html",
+  "editorType": [
+    "figma"
+  ],
+  "networkAccess": {
+    "allowedDomains": [
+      "https://api.github.com"
+    ],
+    "reasoning": "Need to push variable JSON to GitHub repository contents API"
+  }
+}

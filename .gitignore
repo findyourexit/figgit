@@ -1,0 +1,213 @@
+### WebStorm (JetBrains IDEs)
+
+# User-Specific
+.idea/**/workspace.xml
+.idea/**/tasks.xml
+.idea/**/usage.statistics.xml
+.idea/**/dictionaries
+.idea/**/shelf
+
+# AWS User-Specific
+.idea/**/aws.xml
+
+# Generated files
+.idea/**/contentModel.xml
+
+# Sensitive / High-Churn Files
+.idea/**/dataSources/
+.idea/**/dataSources.ids
+.idea/**/dataSources.local.xml
+.idea/**/sqlDataSources.xml
+.idea/**/dynamic.xml
+.idea/**/uiDesigner.xml
+.idea/**/dbnavigator.xml
+
+# Gradle
+.idea/**/gradle.xml
+.idea/**/libraries
+
+# CMake
+cmake-build-*/
+
+# Mongo Explorer Plugin
+.idea/**/mongoSettings.xml
+
+# File-Based Project Format
+*.iws
+
+# IntelliJ
+out/
+
+# Mpeltonen/Sbt-idea Plugin
+.idea_modules/
+
+# JIRA Plugin
+atlassian-ide-plugin.xml
+
+# Cursive Clojure Plugin
+.idea/replstate.xml
+
+# SonarLint Plugin
+.idea/sonarlint/
+
+# Crashlytics Plugin
+com_crashlytics_export_strings.xml
+crashlytics.properties
+crashlytics-build.properties
+fabric.properties
+
+# Editor-Based Rest Client
+.idea/httpRequests
+
+# Android Studio 3.1+ Serialized Cache File
+.idea/caches/build_file_checksums.ser
+
+### Node
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Diagnostic Reports (https://nodejs.org/api/report.html)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Runtime Data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Jscoverage/JSCover
+lib-cov
+
+# Coverage Directory (Istanbul, Etc.)
+coverage
+*.lcov
+
+# Nyc Test Coverage
+.nyc_output
+
+# Grunt Intermediate Storage (https://gruntjs.com/creating-plugins#storing-task-files)
+.grunt
+
+# Bower Dependency Directory (https://bower.io/)
+bower_components
+
+# Node-waf Configuration
+.lock-wscript
+
+# Compiled Binary Addons (https://nodejs.org/api/addons.html)
+build/Release
+
+# Dependency Directories
+node_modules/
+jspm_packages/
+
+# Snowpack Dependency Directory (https://snowpack.dev/)
+web_modules/
+
+# TypeScript Cache
+*.tsbuildinfo
+
+# Optional NPM Cache Directory
+.npm
+
+# Optional Eslint Cache
+.eslintcache
+
+# Optional Stylelint Cache
+.stylelintcache
+
+# Microbundle Cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL History
+.node_repl_history
+
+# Output Files ('npm pack')
+*.tgz
+
+# Yarn Integrity File
+.yarn-integrity
+
+# Dotenv Environment Variable Files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# Parcel-Bundler Cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js Build Output
+.next
+out
+
+# Nuxt.js Build / Generate Output
+.nuxt
+dist
+
+# Gatsby Files
+.cache/
+# Comment in the public line in if your project uses Gatsby and not Next.js
+# https://nextjs.org/blog/next-9-1#public-directory-support
+# public
+
+# Vuepress Build Output
+.vuepress/dist
+
+# Vuepress v2.x Temp & Cache Directory
+.temp
+
+# Docusaurus Cache & Generated Files
+.docusaurus
+
+# Serverless Directories
+.serverless/
+
+# FuseBox Cache
+.fusebox/
+
+# DynamoDB Local Files
+.dynamodb/
+
+# TernJS Port File
+.tern-port
+
+# Stores VSCode Versions Used For Testing VSCode Extensions
+.vscode-test
+
+# Yarn v2
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+### React
+
+.DS_*
+**/*.backup.*
+**/*.back.*
+
+node_modules
+
+*.sublime*
+
+psd
+thumb
+sketch
+
+### macOS
+
+.DS_Store

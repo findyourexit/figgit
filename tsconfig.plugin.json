@@ -1,0 +1,27 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "module": "ESNext",
+    "target": "ES2017",
+    "lib": [
+      "ES2017"
+    ],
+    "jsx": "preserve"
+  },
+  "include": [
+    "src/plugin.ts",
+    "src/export/**/*",
+    "src/github/**/*",
+    "src/util/**/*",
+    "src/messaging.ts",
+    "src/shared/**/*",
+    "src/types/**/*"
+  ],
+  "exclude": [
+    "src/ui/**/*",
+    "node_modules",
+    "dist"
+  ]
+}
