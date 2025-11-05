@@ -20,17 +20,36 @@ A Figma plugin that extracts design variables (colors, typography, spacing, etc.
 - **Secure Token Storage**: GitHub PAT stored only in Figma's clientStorage (never exported)
 - **Keyboard Shortcuts**: ⌘/Ctrl+E to export, ⌘/Ctrl+Enter to commit, Esc to close
 - **Dark Mode Support**: Automatic theme matching with Figma (⚠️ WIP)
+- 
+## Quick Installation
 
-## Quick Start
-
-Want to test-drive the plugin in minutes?
-
-1. **Install**: Import `manifest.json` in Figma Desktop → Plugins → Development
-2. **Configure**: Enter GitHub owner/repo/branch and save your Personal Access Token
-3. **Sync**: Click "Export Variables" → "Commit to GitHub"
+1. **Extract this ZIP file** to a folder on your computer (remember where you put it!)
+2. **Open Figma Desktop** (download from <https://www.figma.com/downloads/> if you don't have it)
+3. In Figma, go to **Menu** → **Plugins** → **Development** → **Import plugin from manifest...**
+4. Navigate to the folder where you extracted these files
+5. Select `manifest.json`
+6. Done! The plugin will appear under **Plugins** → **Development** → **FigGit**
 
 > [!TIP]
-> When presented with the option to save your inputs, check the box. It'll make your life exporting next time much easier!
+> When using the plugin, you'll be given an opportunity to save your input settings, using the "Save Settings" button - this is highly recommended, as it'll make your life easier for the next time you're exporting Figma design tokens!
+
+## What's in this package?
+
+This development package contains three files:
+
+- `manifest.json` - Plugin configuration (required for import)
+- `plugin.js` - The plugin's backend code
+- `index.html` - The plugin's user interface
+
+All three files must stay together in the same folder.
+
+## Updating
+
+When a new version is available:
+
+1. Download the latest build
+2. Extract it to the **same folder** (overwrite existing files)
+3. In Figma: **Menu** → **Plugins** → **Development** → **Reload plugin**
 
 ## JSON Output Schema
 
