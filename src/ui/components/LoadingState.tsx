@@ -21,15 +21,15 @@ export const LoadingState: React.FC<LoadingStateProps> = ({ message, submessage 
         gap: '8px',
         padding: '8px 0',
         fontSize: '12px',
-        color: 'var(--figma-color-text-secondary, #666)',
+        color: 'var(--figma-color-text-secondary)',
       }}
     >
       <div
         style={{
           width: '12px',
           height: '12px',
-          border: '2px solid var(--figma-color-border, #ccc)',
-          borderTopColor: 'var(--figma-color-border-brand, #18A0FB)',
+          border: '2px solid var(--figma-color-border)',
+          borderTopColor: 'var(--figma-color-border-brand)',
           borderRadius: '50%',
           animation: 'spin 0.8s linear infinite',
         }}

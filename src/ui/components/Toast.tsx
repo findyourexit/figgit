@@ -25,11 +25,9 @@ export const Toast: React.FC<ToastProps> = ({ notification, onDismiss }) => {
       aria-live={isError ? 'assertive' : 'polite'}
       onClick={() => onDismiss(notification.id)}
       style={{
-        background: isError
-          ? 'var(--figma-color-bg-danger, #ffe6e6)'
-          : 'var(--figma-color-bg-brand, #eef5ff)',
-        border: `1px solid ${isError ? 'var(--figma-color-border-danger, #ff9090)' : 'var(--figma-color-border-brand, #91b4ff)'}`,
-        color: 'var(--figma-color-text, #000)',
+        background: isError ? 'var(--figma-color-bg-danger)' : 'var(--figma-color-bg-brand)',
+        border: `1px solid ${isError ? 'var(--figma-color-border-danger)' : 'var(--figma-color-border-brand)'}`,
+        color: 'var(--figma-color-text)',
         padding: '8px 12px',
         fontSize: '11px',
         borderRadius: '4px',

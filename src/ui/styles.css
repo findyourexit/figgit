@@ -1,3 +1,13 @@
+/**
+ * FigGit Styles
+ * 
+ * This plugin uses Figma's built-in theme colors (enabled via themeColors: true in plugin.ts).
+ * All --figma-color-* CSS variables should be automatically provided by Figma.
+ * 
+ * Fallback: If Figma doesn't provide the variables, we detect the theme via React useEffect
+ * and set the CSS custom properties directly on :root via JavaScript.
+ */
+
 * {
   box-sizing: border-box;
 }
@@ -15,8 +25,8 @@ body {
     sans-serif;
   margin: 0;
   padding: 0;
-  background: var(--figma-color-bg, #ffffff);
-  color: var(--figma-color-text, #333);
+  background: var(--figma-color-bg);
+  color: var(--figma-color-text);
   font-size: 11px;
   line-height: 16px;
 }
@@ -30,7 +40,7 @@ h3,
 h4 {
   margin: 0 0 8px 0;
   font-weight: 600;
-  color: var(--figma-color-text, #333);
+  color: var(--figma-color-text);
 }
 
 h3 {
@@ -46,26 +56,26 @@ h4 {
 input[type='text'],
 input[type='password'] {
   padding: 6px 8px;
-  border: 1px solid var(--figma-color-border, #ccc);
+  border: 1px solid var(--figma-color-border);
   border-radius: 4px;
   font-size: 11px;
   width: 100%;
   font-family: inherit;
-  background: var(--figma-color-bg, #ffffff);
-  color: var(--figma-color-text, #333);
+  background: var(--figma-color-bg);
+  color: var(--figma-color-text);
 }
 
 input[type='text']:focus,
 input[type='password']:focus {
   outline: none;
-  border-color: var(--figma-color-border-selected, #18a0fb);
-  box-shadow: 0 0 0 1px var(--figma-color-border-selected, #18a0fb);
+  border-color: var(--figma-color-border-selected);
+  box-shadow: 0 0 0 1px var(--figma-color-border-selected);
 }
 
 input[type='text']:disabled,
 input[type='password']:disabled {
-  background: var(--figma-color-bg-disabled, #f0f0f0);
-  color: var(--figma-color-text-disabled, #999);
+  background: var(--figma-color-bg-disabled);
+  color: var(--figma-color-text-disabled);
   cursor: not-allowed;
 }
 
@@ -81,36 +91,36 @@ button {
 }
 
 button.button--primary {
-  background: var(--figma-color-bg-brand, #18a0fb);
-  color: var(--figma-color-text-onbrand, white);
+  background: var(--figma-color-bg-brand);
+  color: var(--figma-color-text-onbrand);
 }
 
 button.button--primary:hover {
-  background: var(--figma-color-bg-brand-hover, #0d8ce8);
+  background: var(--figma-color-bg-brand-hover);
 }
 
 button.button--primary:active {
-  background: var(--figma-color-bg-brand-pressed, #0b7fd4);
+  background: var(--figma-color-bg-brand-pressed);
 }
 
 button.button--primary:disabled {
-  background: var(--figma-color-bg-disabled, #ccc);
-  color: var(--figma-color-text-disabled, #999);
+  background: var(--figma-color-bg-disabled);
+  color: var(--figma-color-text-disabled);
   cursor: not-allowed;
 }
 
 button.button--secondary {
-  background: var(--figma-color-bg, #ffffff);
-  color: var(--figma-color-text, #333);
-  border: 1px solid var(--figma-color-border, #ccc);
+  background: var(--figma-color-bg);
+  color: var(--figma-color-text);
+  border: 1px solid var(--figma-color-border);
 }
 
 button.button--secondary:hover {
-  background: var(--figma-color-bg-hover, #f0f0f0);
+  background: var(--figma-color-bg-hover);
 }
 
 button.button--secondary:active {
-  background: var(--figma-color-bg-pressed, #e0e0e0);
+  background: var(--figma-color-bg-pressed);
 }
 
 button.button--secondary:disabled {
@@ -123,7 +133,7 @@ label {
   margin-bottom: 4px;
   font-size: 11px;
   font-weight: 500;
-  color: var(--figma-color-text, #333);
+  color: var(--figma-color-text);
 }
 
 .section {
@@ -144,8 +154,8 @@ label {
 }
 
 .code-block {
-  background: var(--figma-color-bg-secondary, #f5f5f5);
-  color: var(--figma-color-text, #333);
+  background: var(--figma-color-bg-secondary);
+  color: var(--figma-color-text);
   font-family:
     'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
   padding: 8px;
@@ -153,7 +163,7 @@ label {
   font-size: 11px;
   max-height: 180px;
   overflow: auto;
-  border: 1px solid var(--figma-color-border, #e0e0e0);
+  border: 1px solid var(--figma-color-border);
 }
 
 .notice {
@@ -165,15 +175,15 @@ label {
 }
 
 .notice.info {
-  background: var(--figma-color-bg-brand-tertiary, #eef5ff);
-  color: var(--figma-color-text-brand, #0d99ff);
-  border-color: var(--figma-color-border-brand, #b3d9ff);
+  background: var(--figma-color-bg-brand-tertiary);
+  color: var(--figma-color-text-brand);
+  border-color: var(--figma-color-border-brand);
 }
 
 .notice.error {
-  background: var(--figma-color-bg-danger-tertiary, #ffecec);
-  color: var(--figma-color-text-danger, #f24822);
-  border-color: var(--figma-color-border-danger, #ffb3b3);
+  background: var(--figma-color-bg-danger-tertiary);
+  color: var(--figma-color-text-danger);
+  border-color: var(--figma-color-border-danger);
 }
 
 button.small {
@@ -189,13 +199,13 @@ button.small {
 
 hr {
   border: none;
-  border-top: 1px solid var(--figma-color-border, #ddd);
+  border-top: 1px solid var(--figma-color-border);
   margin: 16px 0;
 }
 
 .progress {
   height: 4px;
-  background: var(--figma-color-bg-secondary, #e5e5e5);
+  background: var(--figma-color-bg-secondary);
   position: relative;
   overflow: hidden;
   border-radius: 2px;
@@ -206,7 +216,7 @@ hr {
   left: 0;
   top: 0;
   bottom: 0;
-  background: var(--figma-color-bg-brand, #18a0fb);
+  background: var(--figma-color-bg-brand);
   animation: load 1s linear infinite;
   width: 40%;
 }

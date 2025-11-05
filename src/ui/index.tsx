@@ -459,13 +459,13 @@ const AppContent: React.FC = () => {
       {!isOnline && (
         <div
           style={{
-            background: 'var(--figma-color-bg-warning, #fff4e5)',
-            border: '1px solid var(--figma-color-border-warning, #ffb020)',
+            background: 'var(--figma-color-bg-warning)',
+            border: '1px solid var(--figma-color-border-warning)',
             padding: '8px',
             borderRadius: '4px',
             marginBottom: '12px',
             fontSize: '11px',
-            color: 'var(--figma-color-text, #000)',
+            color: 'var(--figma-color-text)',
           }}
         >
           ⚠️ You are offline. GitHub operations are disabled.
@@ -548,7 +548,7 @@ const AppContent: React.FC = () => {
             <h4 style={{ margin: '8px 0' }}>GitHub Token</h4>
             {tokenPresent ? (
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                <div style={{ fontSize: 12, color: 'var(--figma-color-text-success, green)' }}>
+                <div style={{ fontSize: 12, color: 'var(--figma-color-text-success)' }}>
                   Token stored
                 </div>
                 <Button variant="secondary" onClick={handleClearToken}>
@@ -562,12 +562,12 @@ const AppContent: React.FC = () => {
                   {tokenValidation.status === 'checking' ? 'Validating…' : 'Validate'}
                 </Button>
                 {tokenValidation.status === 'valid' && (
-                  <span style={{ fontSize: 11, color: 'var(--figma-color-text-success, #2d7b2d)' }}>
+                  <span style={{ fontSize: 11, color: 'var(--figma-color-text-success)' }}>
                     ✔ {tokenValidation.login}
                   </span>
                 )}
                 {tokenValidation.status === 'invalid' && (
-                  <span style={{ fontSize: 11, color: 'var(--figma-color-text-danger, #b00020)' }}>
+                  <span style={{ fontSize: 11, color: 'var(--figma-color-text-danger)' }}>
                     Invalid
                   </span>
                 )}
@@ -599,7 +599,7 @@ const AppContent: React.FC = () => {
           <section style={{ marginBottom: 12 }}>
             <h4 style={{ margin: '8px 0' }}>
               Export{' '}
-              <span style={{ fontSize: '10px', color: 'var(--figma-color-text-secondary, #999)' }}>
+              <span style={{ fontSize: '10px', color: 'var(--figma-color-text-secondary)' }}>
                 (⌘E)
               </span>
             </h4>
@@ -627,7 +627,7 @@ const AppContent: React.FC = () => {
               <div
                 style={{
                   fontSize: 12,
-                  color: 'var(--figma-color-text-danger, red)',
+                  color: 'var(--figma-color-text-danger)',
                   marginTop: 6,
                 }}
               >
@@ -640,7 +640,7 @@ const AppContent: React.FC = () => {
                 style={{
                   maxHeight: 200,
                   overflow: 'auto',
-                  background: 'var(--figma-color-bg-secondary, #f5f5f5)',
+                  background: 'var(--figma-color-bg-secondary)',
                   padding: 8,
                   marginTop: 8,
                   fontSize: 11,
@@ -664,9 +664,9 @@ const AppContent: React.FC = () => {
               <div
                 style={{
                   marginTop: 10,
-                  border: '1px solid var(--figma-color-border, #ddd)',
+                  border: '1px solid var(--figma-color-border)',
                   padding: 8,
-                  background: 'var(--figma-color-bg-secondary, #fafafa)',
+                  background: 'var(--figma-color-bg-secondary)',
                   borderRadius: 4,
                 }}
               >
@@ -690,7 +690,7 @@ const AppContent: React.FC = () => {
                   <div
                     style={{
                       fontSize: 11,
-                      color: 'var(--figma-color-text-danger, red)',
+                      color: 'var(--figma-color-text-danger)',
                       marginTop: 4,
                     }}
                   >
@@ -710,7 +710,7 @@ const AppContent: React.FC = () => {
                       style={{
                         fontSize: 11,
                         marginBottom: 4,
-                        color: 'var(--figma-color-text-secondary, #666)',
+                        color: 'var(--figma-color-text-secondary)',
                       }}
                     >
                       {diff.counts.addedVariables} added vars · {diff.counts.removedVariables}{' '}
@@ -742,10 +742,7 @@ const AppContent: React.FC = () => {
                           <strong>- Collections</strong>
                           <ul style={{ margin: '4px 0', paddingLeft: 20 }}>
                             {diff.removedCollections.map((c) => (
-                              <li
-                                key={c.id}
-                                style={{ color: 'var(--figma-color-text-danger, #b00020)' }}
-                              >
+                              <li key={c.id} style={{ color: 'var(--figma-color-text-danger)' }}>
                                 - {c.name}
                               </li>
                             ))}
@@ -779,10 +776,7 @@ const AppContent: React.FC = () => {
                           <strong>- Variables</strong>
                           <ul style={{ margin: '4px 0', paddingLeft: 20 }}>
                             {diff.removedVariables.map((v) => (
-                              <li
-                                key={v.id}
-                                style={{ color: 'var(--figma-color-text-danger, #b00020)' }}
-                              >
+                              <li key={v.id} style={{ color: 'var(--figma-color-text-danger)' }}>
                                 - {v.name}
                               </li>
                             ))}
@@ -800,9 +794,7 @@ const AppContent: React.FC = () => {
                                   ? `${v.nameBefore} → ${v.nameAfter}`
                                   : v.nameAfter}{' '}
                                 {v.changedModes.length > 0 && (
-                                  <span
-                                    style={{ color: 'var(--figma-color-text-secondary, #555)' }}
-                                  >
+                                  <span style={{ color: 'var(--figma-color-text-secondary)' }}>
                                     ({v.changedModes.length} modes)
                                   </span>
                                 )}
@@ -828,7 +820,7 @@ const AppContent: React.FC = () => {
           <section style={{ marginBottom: 12 }}>
             <h4 style={{ margin: '8px 0' }}>
               Commit{' '}
-              <span style={{ fontSize: '10px', color: 'var(--figma-color-text-secondary, #999)' }}>
+              <span style={{ fontSize: '10px', color: 'var(--figma-color-text-secondary)' }}>
                 (⌘↩)
               </span>
             </h4>
@@ -836,7 +828,7 @@ const AppContent: React.FC = () => {
               style={{
                 fontSize: 11,
                 marginBottom: 4,
-                color: 'var(--figma-color-text-secondary, #666)',
+                color: 'var(--figma-color-text-secondary)',
               }}
             >
               Commit message preview:
@@ -844,7 +836,7 @@ const AppContent: React.FC = () => {
               <code
                 style={{
                   fontSize: 11,
-                  background: 'var(--figma-color-bg-secondary, #f0f0f0)',
+                  background: 'var(--figma-color-bg-secondary)',
                   padding: '2px 4px',
                   borderRadius: 2,
                 }}
@@ -874,7 +866,7 @@ const AppContent: React.FC = () => {
               <div
                 style={{
                   fontSize: 12,
-                  color: 'var(--figma-color-text-danger, red)',
+                  color: 'var(--figma-color-text-danger)',
                   marginTop: 6,
                 }}
               >
@@ -887,7 +879,7 @@ const AppContent: React.FC = () => {
                 style={{
                   fontSize: 12,
                   marginTop: 6,
-                  color: 'var(--figma-color-text-secondary, #666)',
+                  color: 'var(--figma-color-text-secondary)',
                 }}
               >
                 Skipped (no changes)
@@ -902,7 +894,7 @@ const AppContent: React.FC = () => {
                     href={commitState.url}
                     target="_blank"
                     rel="noreferrer"
-                    style={{ color: 'var(--figma-color-text-brand, #18A0FB)' }}
+                    style={{ color: 'var(--figma-color-text-brand)' }}
                   >
                     view
                   </a>
@@ -920,6 +912,9 @@ const AppContent: React.FC = () => {
 };
 
 const App: React.FC = () => {
+  // Figma automatically provides CSS variables when themeColors: true is set in figma.showUI()
+  // No manual theme detection needed - Figma injects a <style id="figma-style"> with all color values
+  // and adds 'figma-light' or 'figma-dark' class to <html> element
   return (
     <ErrorBoundary>
       <PluginProvider>

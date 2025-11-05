@@ -82,7 +82,7 @@ class ErrorBoundary extends Component<Props, State> {
               fontSize: '16px',
               fontWeight: 600,
               marginBottom: '8px',
-              color: 'var(--figma-color-text, #333)',
+              color: 'var(--figma-color-text)',
             }}
           >
             Something went wrong
@@ -90,7 +90,7 @@ class ErrorBoundary extends Component<Props, State> {
           <p
             style={{
               fontSize: '11px',
-              color: 'var(--figma-color-text-secondary, #666)',
+              color: 'var(--figma-color-text-secondary)',
               marginBottom: '16px',
               lineHeight: '16px',
             }}
@@ -111,7 +111,7 @@ class ErrorBoundary extends Component<Props, State> {
                 style={{
                   cursor: 'pointer',
                   marginBottom: '8px',
-                  color: 'var(--figma-color-text-secondary, #666)',
+                  color: 'var(--figma-color-text-secondary)',
                 }}
               >
                 Error details
@@ -121,8 +121,8 @@ class ErrorBoundary extends Component<Props, State> {
                 style={{
                   padding: '8px',
                   borderRadius: '4px',
-                  backgroundColor: 'var(--figma-color-bg-secondary, #f5f5f5)',
-                  border: '1px solid var(--figma-color-border, #e0e0e0)',
+                  backgroundColor: 'var(--figma-color-bg-secondary)',
+                  border: '1px solid var(--figma-color-border)',
                   fontSize: '10px',
                   fontFamily: 'monospace',
                   whiteSpace: 'pre-wrap',
