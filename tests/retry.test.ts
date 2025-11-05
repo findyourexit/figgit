@@ -67,8 +67,12 @@ describe('withRetry', () => {
       },
     });
 
-    await vi.advanceTimersByTimeAsync(100);
-    await vi.advanceTimersByTimeAsync(200);
+    // Advance timers and wait for promise to settle
+    await Promise.all([
+      vi.advanceTimersByTimeAsync(100),
+      vi.advanceTimersByTimeAsync(200),
+      promise.catch(() => {}), // Catch to prevent unhandled rejection
+    ]);
 
     await expect(promise).rejects.toThrow('Network error');
 
@@ -89,9 +93,13 @@ describe('withRetry', () => {
       },
     });
 
-    await vi.advanceTimersByTimeAsync(1000);
-    await vi.advanceTimersByTimeAsync(2000); // Capped at maxDelay
-    await vi.advanceTimersByTimeAsync(2000); // Capped at maxDelay
+    // Advance timers and wait for promise to settle
+    await Promise.all([
+      vi.advanceTimersByTimeAsync(1000),
+      vi.advanceTimersByTimeAsync(2000), // Capped at maxDelay
+      vi.advanceTimersByTimeAsync(2000), // Capped at maxDelay
+      promise.catch(() => {}), // Catch to prevent unhandled rejection
+    ]);
 
     await expect(promise).rejects.toThrow('Network error');
 
@@ -108,7 +116,11 @@ describe('withRetry', () => {
       onRetry,
     });
 
-    await vi.advanceTimersByTimeAsync(100);
+    // Advance timers and wait for promise to settle
+    await Promise.all([
+      vi.advanceTimersByTimeAsync(100),
+      promise.catch(() => {}), // Catch to prevent unhandled rejection
+    ]);
 
     await expect(promise).rejects.toThrow('Network error');
 
@@ -176,7 +188,11 @@ describe('withRetry', () => {
 
     const promise = withRetry(fn, { maxAttempts: 2, initialDelay: 100 });
 
-    await vi.advanceTimersByTimeAsync(100);
+    // Advance timers and wait for promise to settle
+    await Promise.all([
+      vi.advanceTimersByTimeAsync(100),
+      promise.catch(() => {}), // Catch to prevent unhandled rejection
+    ]);
 
     await expect(promise).rejects.toThrow('String error');
   });
