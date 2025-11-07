@@ -179,6 +179,9 @@ export const PluginProvider: FunctionComponent<PluginProviderProps> = ({ childre
             notify('info', 'No changes detected - commit skipped');
           } else {
             notify('success', 'Successfully committed to GitHub!');
+            // Invalidate remote data cache after successful commit
+            // This ensures the diff viewer will re-fetch and show correct state
+            setRemoteDataState({ loading: false, fetched: false });
           }
         } else {
           setCommitState({
