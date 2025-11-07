@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="assets/logo.png" alt="FigGit Logo" width="128"/>
+</div>
+
 # FigGit
 
 [![CI Status](https://github.com/findyourexit/figgit/workflows/CI/badge.svg)](https://github.com/findyourexit/figgit/actions)
