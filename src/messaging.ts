@@ -11,6 +11,7 @@
  */
 
 import { ExportRoot } from './shared/types';
+import { DtcgRoot } from './shared/dtcg-types';
 
 /**
  * Messages sent from the UI to the Plugin.
@@ -24,6 +25,7 @@ import { ExportRoot } from './shared/types';
  * - VALIDATE_TOKEN: Test if stored token is valid
  * - COMMIT_REQUEST: Commit exported JSON to GitHub
  * - FETCH_REMOTE_EXPORT: Fetch existing JSON from GitHub for diff
+ * - COPY_TO_CLIPBOARD: Copy text to system clipboard
  * - PING: Simple connectivity test
  */
 export type UIToPluginMessage =
@@ -33,8 +35,15 @@ export type UIToPluginMessage =
   | { type: 'SAVE_TOKEN'; token: string }
   | { type: 'CLEAR_TOKEN' }
   | { type: 'VALIDATE_TOKEN' }
-  | { type: 'COMMIT_REQUEST'; exportData: ExportRoot; dryRun: boolean; commitPrefix: string }
+  | {
+      type: 'COMMIT_REQUEST';
+      exportData: ExportRoot | DtcgRoot;
+      dryRun: boolean;
+      commitPrefix: string;
+    }
   | { type: 'FETCH_REMOTE_EXPORT' } // Request the current remote export JSON (if file exists)
+  | { type: 'COPY_TO_CLIPBOARD'; text: string } // Copy text to clipboard
+  | { type: 'NOTIFY'; level: 'info' | 'error'; message: string } // Display notification in Figma UI
   | { type: 'PING' };
 
 /**
@@ -49,14 +58,14 @@ export type UIToPluginMessage =
  * - FETCH_REMOTE_EXPORT_RESULT: Remote file contents or null if not found
  */
 export type PluginToUIMessage =
-  | { type: 'EXPORT_RESULT'; ok: true; data: ExportRoot }
+  | { type: 'EXPORT_RESULT'; ok: true; data: ExportRoot | DtcgRoot }
   | { type: 'EXPORT_RESULT'; ok: false; error: string }
   | { type: 'SETTINGS_RESPONSE'; payload: PersistedSettings & { tokenPresent: boolean } }
   | { type: 'NOTIFY'; level: 'info' | 'error'; message: string }
   | { type: 'TOKEN_VALIDATION'; ok: boolean; login?: string; error?: string }
   | { type: 'COMMIT_RESULT'; ok: true; skipped?: boolean; url?: string }
   | { type: 'COMMIT_RESULT'; ok: false; error: string }
-  | { type: 'FETCH_REMOTE_EXPORT_RESULT'; ok: true; data: ExportRoot | null }
+  | { type: 'FETCH_REMOTE_EXPORT_RESULT'; ok: true; data: ExportRoot | DtcgRoot | null }
   | { type: 'FETCH_REMOTE_EXPORT_RESULT'; ok: false; error: string };
 
 /**

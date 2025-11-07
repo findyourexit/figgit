@@ -18,6 +18,18 @@
 import { withRetry } from '../util/retry';
 
 /**
+ * GitHub file metadata from Contents API.
+ */
+interface GitHubFile {
+  /** File SHA (Git blob hash) */
+  sha: string;
+  /** Base64-encoded file content */
+  content: string;
+  /** HTML URL to view the file on GitHub */
+  html_url: string;
+}
+
+/**
  * Result of a file upsert operation.
  */
 export interface UpsertResult {
@@ -74,11 +86,11 @@ async function ghFetch(url: string, token: string, init: RequestInit = {}) {
   };
 
   // Add Content-Type for JSON payloads
-  if (init.body && !(init.headers && (init.headers as any)['Content-Type'])) {
+  if (init.body && !(init.headers && (init.headers as Record<string, string>)['Content-Type'])) {
     headers['Content-Type'] = 'application/json';
   }
 
-  init.headers = { ...headers, ...(init.headers as any) };
+  init.headers = { ...headers, ...(init.headers as Record<string, string>) };
 
   // Retry network requests with exponential backoff
   return withRetry(
@@ -153,7 +165,7 @@ async function getExistingFile(
   branch: string,
   path: string,
   token: string
-) {
+): Promise<GitHubFile | null> {
   const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${branch}`;
   const res = await ghFetch(url, token);
 
@@ -392,7 +404,10 @@ export async function upsertFile(options: GitHubUpsertOptions): Promise<UpsertRe
    * @param attempt - Attempt number (0 = first try, 1 = retry)
    * @returns Upsert result
    */
-  async function attemptWrite(prevExisting: any, attempt: number): Promise<UpsertResult> {
+  async function attemptWrite(
+    prevExisting: GitHubFile | null,
+    attempt: number
+  ): Promise<UpsertResult> {
     const putRes = await ghFetch(
       `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`,
       token,

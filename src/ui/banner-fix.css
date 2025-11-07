@@ -1,0 +1,11 @@
+/**
+ * Banner Icon Alignment Fix
+ * 
+ * Overrides @create-figma-plugin/ui's Banner component to properly center
+ * icons vertically regardless of content height.
+ */
+
+/* Use a class selector with higher specificity to override the library's styles */
+[class*='banner'] [class*='icon'] {
+  top: 50% !important;
+}

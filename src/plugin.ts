@@ -14,7 +14,7 @@
  */
 
 /// <reference types="@figma/plugin-typings" />
-import { buildVariablesJson } from './export/buildVariablesJson';
+import { buildDtcgJson } from './export/buildDtcgJson';
 import {
   SETTINGS_KEY,
   defaultSettings,
@@ -27,7 +27,7 @@ import { stableStringify } from './util/stableStringify';
 import { validateAllSettings } from './util/validation';
 
 // Show UI on plugin start
-figma.showUI(__html__, { width: 520, height: 620, themeColors: true });
+figma.showUI(__html__, { width: 600, height: 750, themeColors: true });
 
 /**
  * Retrieves plugin settings from Figma's persistent storage.
@@ -73,7 +73,7 @@ async function saveSettings(settings: PersistedSettings) {
  * @returns Promise resolving to true if token exists, false otherwise
  */
 async function hasToken(): Promise<boolean> {
-  return (await figma.clientStorage.getAsync('github_pat')) ? true : false;
+  return !!(await figma.clientStorage.getAsync('github_pat'));
 }
 
 /**
@@ -129,7 +129,7 @@ figma.ui.onmessage = async (msg: UIToPluginMessage) => {
   // Extract variables from the current Figma file
   if (msg.type === 'REQUEST_EXPORT') {
     try {
-      const data = await buildVariablesJson(figma);
+      const data = await buildDtcgJson(figma);
       figma.ui.postMessage({ type: 'EXPORT_RESULT', ok: true, data } as PluginToUIMessage);
     } catch (e) {
       figma.ui.postMessage({
@@ -242,6 +242,17 @@ figma.ui.onmessage = async (msg: UIToPluginMessage) => {
     await validateTokenAndNotify();
   }
 
+  // Copy text to clipboard (handled in UI, this is just for notification)
+  if (msg.type === 'COPY_TO_CLIPBOARD') {
+    // The UI handles the actual copying, we just acknowledge
+    // This message type exists for potential future enhancements
+  }
+
+  // Display notification in Figma UI
+  if (msg.type === 'NOTIFY') {
+    figma.notify(msg.message, { error: msg.level === 'error' });
+  }
+
   // Commit exported variables JSON to GitHub
   if (msg.type === 'COMMIT_REQUEST') {
     try {
@@ -277,7 +288,27 @@ figma.ui.onmessage = async (msg: UIToPluginMessage) => {
         return;
       }
 
-      const newHash = exportData.meta.contentHash || '';
+      // Extract metadata (supports both legacy and DTCG formats)
+      let newHash = '';
+      let vars = 0;
+      let cols = 0;
+
+      // Check if it's DTCG format (has $extensions) or legacy format (has meta)
+      if ('$extensions' in exportData) {
+        // DTCG format
+        const figmaExt = exportData.$extensions?.['com.figma'] as
+          | Record<string, unknown>
+          | undefined;
+        newHash = (figmaExt?.contentHash as string) || '';
+        vars = (figmaExt?.variablesCount as number) || 0;
+        cols = (figmaExt?.collectionsCount as number) || 0;
+      } else if ('meta' in exportData) {
+        // Legacy format
+        const meta = exportData.meta as Record<string, unknown>;
+        newHash = (meta.contentHash as string) || '';
+        vars = (meta.variablesCount as number) || 0;
+        cols = (meta.collectionsCount as number) || 0;
+      }
 
       // Hash comparison happens only here in the plugin (single source of truth)
       // This prevents redundant commits when content hasn't actually changed
@@ -287,14 +318,12 @@ figma.ui.onmessage = async (msg: UIToPluginMessage) => {
       }
 
       // Build commit message with variable/collection counts and timestamp
-      const vars = exportData.meta.variablesCount;
-      const cols = exportData.meta.collectionsCount;
       const ts = new Date().toISOString();
       const prefix =
         msg.commitPrefix || settings.commitPrefix
           ? `${msg.commitPrefix || settings.commitPrefix} `
           : '';
-      const commitMessage = `${prefix}chore(design): update Figma variables (${vars} vars, ${cols} collections) - ${ts}`;
+      const commitMessage = `${prefix}update Figma variables (${vars} vars, ${cols} collections) - ${ts}`;
       const path =
         (settings.folder
           ? settings.folder.replace(/\\+/g, '/').replace(/^\//, '').replace(/\/$/, '') + '/'
@@ -350,6 +379,6 @@ figma.ui.onmessage = async (msg: UIToPluginMessage) => {
  */
 figma.on('run', () => {
   figma.ui.show();
-  figma.ui.resize(520, 620);
+  figma.ui.resize(600, 750);
   figma.ui.postMessage({ type: 'REQUEST_SETTINGS' });
 });

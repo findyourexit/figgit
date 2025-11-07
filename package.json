@@ -1,7 +1,7 @@
 {
   "name": "figgit",
-  "version": "0.1.0",
-  "description": "A Figma plugin to export all local variables to a GitHub repository as JSON with smart change detection.",
+  "version": "0.2.0",
+  "description": "A Figma plugin for exporting variables to GitHub.",
   "author": "Tom Larcher <tom.larcher@gmail.com>",
   "license": "MIT",
   "keywords": [
@@ -13,7 +13,7 @@
     "automation",
     "design-system",
     "typescript",
-    "react"
+    "preact"
   ],
   "repository": {
     "type": "git",
@@ -46,25 +46,19 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@axe-core/react": "^4.11.0",
     "@figma/eslint-plugin-figma-plugins": "^0.16.1",
     "@figma/plugin-typings": "1.103.0",
+    "@preact/preset-vite": "^2.9.1",
     "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "^24.10.0",
-    "@types/react": "18.2.21",
-    "@types/react-dom": "18.2.7",
     "@typescript-eslint/eslint-plugin": "^8.46.3",
     "@typescript-eslint/parser": "^8.46.3",
-    "@vitejs/plugin-react": "^5.1.0",
     "@vitest/coverage-v8": "^4.0.7",
     "@vitest/ui": "^4.0.7",
     "concurrently": "^9.2.1",
     "esbuild": "0.21.5",
     "eslint": "^8.57.1",
-    "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^7.0.1",
     "husky": "^9.1.7",
     "jsdom": "^27.1.0",
     "lint-staged": "^16.2.6",
@@ -76,8 +70,9 @@
     "vitest": "^4.0.7"
   },
   "dependencies": {
-    "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "@create-figma-plugin/ui": "^4.0.3",
+    "@create-figma-plugin/utilities": "^4.0.3",
+    "preact": "^10.19.3"
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": [

@@ -22,7 +22,7 @@
  * // Returns: '{\n  "a": 1,\n  "b": 2\n}'
  * ```
  */
-export function stableStringify(obj: any, space = 2): string {
+export function stableStringify(obj: unknown, space = 2): string {
   return JSON.stringify(sortValue(obj), null, space);
 }
 
@@ -32,7 +32,7 @@ export function stableStringify(obj: any, space = 2): string {
  * @param val - Value to process
  * @returns Sorted copy if object, mapped copy if array, or original value if primitive
  */
-function sortValue(val: any): any {
+function sortValue(val: unknown): unknown {
   // Arrays: recursively process elements but maintain order
   if (Array.isArray(val)) return val.map(sortValue);
 
@@ -42,10 +42,10 @@ function sortValue(val: any): any {
       .sort() // Lexicographic sort ensures consistent ordering
       .reduce(
         (acc, key) => {
-          acc[key] = sortValue(val[key]);
+          acc[key] = sortValue((val as Record<string, unknown>)[key]);
           return acc;
         },
-        {} as Record<string, any>
+        {} as Record<string, unknown>
       );
   }
 

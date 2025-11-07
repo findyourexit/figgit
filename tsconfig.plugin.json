@@ -5,9 +5,7 @@
     "rootDir": "./src",
     "module": "ESNext",
     "target": "ES2017",
-    "lib": [
-      "ES2017"
-    ],
+    "lib": ["ES2017"],
     "jsx": "preserve"
   },
   "include": [
@@ -19,9 +17,5 @@
     "src/shared/**/*",
     "src/types/**/*"
   ],
-  "exclude": [
-    "src/ui/**/*",
-    "node_modules",
-    "dist"
-  ]
+  "exclude": ["src/ui/**/*", "node_modules", "dist"]
 }
