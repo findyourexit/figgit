@@ -8,8 +8,6 @@
   "extends": [
     "eslint:recommended",
     "plugin:@typescript-eslint/recommended",
-    "plugin:react/recommended",
-    "plugin:react-hooks/recommended",
     "plugin:@figma/figma-plugins/recommended"
   ],
   "parser": "@typescript-eslint/parser",
@@ -21,12 +19,7 @@
     },
     "project": "./tsconfig.json"
   },
-  "plugins": [
-    "@typescript-eslint",
-    "react",
-    "react-hooks",
-    "@figma/figma-plugins"
-  ],
+  "plugins": ["@typescript-eslint", "@figma/figma-plugins"],
   "rules": {
     "@typescript-eslint/no-unused-vars": [
       "error",
@@ -35,21 +28,8 @@
       }
     ],
     "@typescript-eslint/no-explicit-any": "warn",
-    "react/react-in-jsx-scope": "off",
-    "react-hooks/rules-of-hooks": "error",
-    "react-hooks/exhaustive-deps": "warn",
     "@figma/figma-plugins/ban-deprecated-sync-methods": "error",
     "@figma/figma-plugins/no-network-access-outside-sandbox": "off"
   },
-  "settings": {
-    "react": {
-      "version": "detect"
-    }
-  },
-  "ignorePatterns": [
-    "dist/",
-    "node_modules/",
-    "*.js",
-    "*.mjs"
-  ]
+  "ignorePatterns": ["dist/", "node_modules/", "*.js", "*.mjs"]
 }

@@ -142,11 +142,11 @@ export async function buildVariablesJson(figmaApi: PluginAPI): Promise<ExportRoo
 }
 
 /**
- * Normalizes a variable's mode value into our structured format.
+ * Normalizes a raw mode value from Figma into our structured format.
  *
- * Figma's variable values can be:
- * - Colors (objects with r, g, b, a properties)
- * - Aliases (references to other variables)
+ * Figma's variable API returns mode values in different shapes:
+ * - Alias: { type: 'VARIABLE_ALIAS', id: '...' }
+ * - Color: { r: 0.5, g: 0.5, b: 0.5, a?: 1 }
  * - Primitives (strings, numbers, booleans)
  *
  * This function detects the type and returns a normalized object.
@@ -154,20 +154,28 @@ export async function buildVariablesJson(figmaApi: PluginAPI): Promise<ExportRoo
  * @param raw - Raw value from Figma's variable API
  * @returns Normalized value with explicit type
  */
-function normalizeModeValue(raw: any): VariableModeValue {
+function normalizeModeValue(raw: unknown): VariableModeValue {
   if (!raw || typeof raw !== 'object') {
     // Primitives (string/number/boolean) or unexpected values
     return inferPrimitive(raw);
   }
 
   // Alias detection: Figma 2025 API uses { type: 'VARIABLE_ALIAS', id: '...' }
-  if (raw.type === 'VARIABLE_ALIAS' && raw.id) {
+  if ('type' in raw && raw.type === 'VARIABLE_ALIAS' && 'id' in raw && typeof raw.id === 'string') {
     return { type: 'ALIAS', refVariableId: raw.id };
   }
 
   // Color detection: Figma colors have r, g, b properties (0-1 range)
-  if (typeof raw.r === 'number' && typeof raw.g === 'number' && typeof raw.b === 'number') {
-    return { type: 'COLOR', value: { r: raw.r, g: raw.g, b: raw.b, a: raw.a ?? 1 } };
+  if (
+    'r' in raw &&
+    typeof raw.r === 'number' &&
+    'g' in raw &&
+    typeof raw.g === 'number' &&
+    'b' in raw &&
+    typeof raw.b === 'number'
+  ) {
+    const a = 'a' in raw && typeof raw.a === 'number' ? raw.a : 1;
+    return { type: 'COLOR', value: { r: raw.r, g: raw.g, b: raw.b, a } };
   }
 
   // Fallback to primitive inference
@@ -180,7 +188,7 @@ function normalizeModeValue(raw: any): VariableModeValue {
  * @param val - Primitive value
  * @returns Typed value object
  */
-function inferPrimitive(val: any): VariableModeValue {
+function inferPrimitive(val: unknown): VariableModeValue {
   switch (typeof val) {
     case 'string':
       return { type: 'STRING', value: val };

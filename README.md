@@ -1,27 +1,38 @@
 # FigGit
 
 [![CI Status](https://github.com/findyourexit/figgit/workflows/CI/badge.svg)](https://github.com/findyourexit/figgit/actions)
-[![Test Coverage](https://img.shields.io/badge/coverage-86.44%25-brightgreen)](https://github.com/findyourexit/figgit)
+[![Test Coverage](https://img.shields.io/badge/coverage-94.51%25-brightgreen)](https://github.com/findyourexit/figgit)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue)](https://www.typescriptlang.org/)
+![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![WCAG 2.1 AA](https://img.shields.io/badge/WCAG-2.1%20Level%20AA-green)](https://www.w3.org/WAI/WCAG21/quickref/)
+<!-- ![Version](https://img.shields.io/github/v/release/findyourexit/figgit) -->
 
-A Figma plugin that extracts design variables (colors, typography, spacing, etc.) and commits them as JSON to a GitHub repository.
+![Figma](https://img.shields.io/badge/Figma-Plugin-F24E1E?logo=figma&logoColor=white)
+![DTCG](https://img.shields.io/badge/DTCG-v2025.10-blue)
+![Code Style](https://img.shields.io/badge/code_style-prettier-ff69b4.svg)
+
+A Figma plugin that extracts design variables (colors, typography, spacing, etc.) and commits them as [DTCG-compliant](https://www.designtokens.org/) JSON to a GitHub repository.
 
 ## Features
 
-- **One(ish)-click Export**: Extract all Figma variables with full metadata
+- **DTCG-Compliant Export**: Exports design tokens following the [Design Tokens Community Group (DTCG) specification v2025.10](https://www.designtokens.org/tr/2025.10/)
+- **One-Click Export**: Extract all Figma variables with full metadata
+- **Tab-Based Interface**: Organized UI with Export, Preview, and Settings tabs
 - **Direct GitHub Integration**: Commit directly to any branch (creates branch if needed)
 - **Smart Change Detection**: SHA-256 content hashing prevents redundant commits
-- **Diff Preview**: See changes before committing (added/modified/removed variables)
+- **Diff Preview**: See token-level changes before committing (added/modified/removed)
+- **JSON Preview**: View and copy exported DTCG JSON directly in the plugin
 - **Dry Run Mode**: Test without committing to verify changes
 - **Automatic Conflict Resolution**: Auto-retry on 409 conflicts
+- **Remote Variable Support**: Handles references to external/library variables
 - **Rich Metadata**: Includes export timestamp, plugin version, file info, and content hash
 - **Secure Token Storage**: GitHub PAT stored only in Figma's clientStorage (never exported)
-- **Keyboard Shortcuts**: ⌘/Ctrl+E to export, ⌘/Ctrl+Enter to commit, Esc to close
-- **Dark Mode Support**: Automatic theme matching with Figma (⚠️ WIP)
-- 
+- **Dark Mode Support**: Automatic theme matching with Figma
+
 ## Quick Installation
+
+> [!NOTE]
+> For the latest release, visit the [Releases page](https://github.com/findyourexit/figgit/releases).
 
 1. **Download the latest release** from the [Releases page](https://github.com/findyourexit/figgit/releases).
 2. **Extract the ZIP file** to a folder on your computer (remember where you put it!).
@@ -31,9 +42,8 @@ A Figma plugin that extracts design variables (colors, typography, spacing, etc.
 6. Select `manifest.json`.
 7. Done! The plugin will appear under **Plugins** → **Development** → **FigGit**.
 
-
 > [!TIP]
-> When using the plugin, you'll be given an opportunity to save your input settings, using the "Save Settings" button - this is highly recommended, as it'll make your life easier for the next time you're exporting Figma design tokens!
+> The plugin will remember your settings between sessions. Use the "Settings" tab to configure your repository and save your GitHub token for easy reuse.
 
 ## What's in this package?
 
@@ -51,67 +61,99 @@ When a new version is available:
 
 1. Download the latest build
 2. Extract it to the **same folder** (overwrite existing files)
-3. In Figma: **Menu** → **Plugins** → **Development** → **Reload plugin**
+3. In Figma Desktop: **Plugins** → **Development** → **Hot reload plugin**
 
 ## JSON Output Schema
 
-> [!WARNING]
-> The JSON schema is subject to change until `v1.0.0` release. Please avoid relying on it for production use until then.
+The plugin exports design tokens in [DTCG (Design Tokens Community Group) format v2025.10](https://www.designtokens.org/tr/2025.10/), a standardized format for exchanging design tokens between tools.
 
-The plugin exports a structured JSON file with complete variable information:
+### DTCG Format Structure
+
+Tokens are organized in nested groups with the following properties:
+
+- `$value`: The token's value in the primary mode
+- `$type`: Token type (color, dimension, number, string, boolean, fontFamily, etc.)
+- `$description`: Optional human-readable description
+- `$extensions`: Tool-specific metadata (Figma stores modes, scopes, codeSyntax here)
+
+**Token Path Convention:**
+
+- If variable name contains dots: use name as-is (e.g., `color.bg.default` → `color.bg.default`)
+- If variable name has no dots: combine collection + variable name (e.g., Collection: `Colors`, Variable: `primary` → `colors.primary`)
+- Remote/library variables: prefixed with `external.*`
+
+Example DTCG export:
 
 ```json
 {
-  "meta": {
-    "exportedAt": "2025-01-15T10:30:00.000Z",
-    "fileName": "Design System",
-    "pluginVersion": "0.1.0",
-    "figmaFileId": "abc123def456",
-    "collectionsCount": 3,
-    "variablesCount": 42,
-    "contentHash": "sha256:a1b2c3..."
-  },
-  "collections": [
-    {
-      "id": "VariableCollectionId:123:456",
-      "name": "Color / Theme",
-      "modes": [
-        {
-          "id": "123:0",
-          "name": "Light"
-        }
-      ],
-      "variables": [
-        {
-          "id": "VariableID:789:012",
-          "name": "color.bg.default",
-          "resolvedType": "COLOR",
-          "isAlias": false,
-          "scopes": ["ALL_SCOPES"],
-          "valuesByMode": {
-            "123:0": {
-              "type": "COLOR",
-              "value": {
-                "r": 1,
-                "g": 1,
-                "b": 1,
-                "a": 1
-              }
-            }
+  "color": {
+    "bg": {
+      "default": {
+        "$value": "#ffffff",
+        "$type": "color",
+        "$extensions": {
+          "com.figma": {
+            "modes": {
+              "Light": "#ffffff",
+              "Dark": "#1a1a1a"
+            },
+            "scopes": ["ALL_SCOPES"],
+            "codeSyntax": {},
+            "hiddenFromPublishing": false
           }
         }
-      ]
+      }
     }
-  ]
+  },
+  "spacing": {
+    "sm": {
+      "$value": {
+        "value": 8,
+        "unit": "px"
+      },
+      "$type": "dimension"
+    }
+  },
+  "$extensions": {
+    "com.figma": {
+      "exportedAt": "2025-01-15T10:30:00.000Z",
+      "fileName": "Design System",
+      "pluginVersion": "0.2.0",
+      "collectionsCount": 3,
+      "variablesCount": 42,
+      "contentHash": "sha256:a1b2c3..."
+    }
+  }
 }
 ```
+
+### Key Features
+
+- **Nested Groups**: Tokens organized by dot-separated paths (e.g., `color.bg.default`)
+- **Multi-Mode Support**: All mode values stored in `$extensions.com.figma.modes` (primary mode in `$value`)
+- **Alias References**: References use DTCG format `{path.to.token}`
+- **Type Safety**: Explicit `$type` for each token with automatic type inference
+- **Smart Type Detection**: Dimension vs number distinction based on token path and scopes
+- **Color Format**: Colors exported as hex strings in sRGB color space
+- **Metadata**: Export metadata in `$extensions.com.figma` at root level
+
+### Supported Token Types
+
+| DTCG Type    | Figma Type                  | Example Value                    |
+|--------------|-----------------------------|----------------------------------|
+| `color`      | COLOR                       | `"#ffffff"` or `{color.primary}` |
+| `dimension`  | FLOAT (with px/rem context) | `{"value": 16, "unit": "px"}`    |
+| `number`     | FLOAT                       | `1.5`                            |
+| `string`     | STRING                      | `"Roboto"`                       |
+| `boolean`    | BOOLEAN                     | `true`                           |
+| `fontFamily` | STRING (font context)       | `"Inter"`                        |
 
 ## Installation
 
 ### Requirements
 
 - **Figma Desktop** (plugin API not available in browser version)
-- **Node.js 18+** (for building the plugin)
+- **Node.js 20+** (for building the plugin)
 - **GitHub Repository** with write access
 - **GitHub Personal Access Token** (fine-grained or classic with `repo` scope)
 
@@ -148,47 +190,74 @@ The token is stored securely in Figma's `clientStorage` and never exported or se
 
 ## How to Use
 
-1. **Open Plugin**: In Figma Desktop, run the plugin from the Plugins menu
-2. **Configure Repository**:
-   - Enter GitHub owner (username or organization)
-   - Enter repository name
-   - Specify target branch (will be created if it doesn't exist)
-   - (Optional) Specify folder path within the repo
-   - Set output filename (must end with `.json`)
-   - (Optional) Add commit message prefix (e.g., `feat(tokens):`)
-3. **Save Token**:
-   - Paste your GitHub Personal Access Token
-   - Click "Save GitHub Token"
-   - Click "Validate" to verify access
-4. **Export Variables**:
-   - Click "Export Variables" to extract all variables from the current Figma file
-   - Review the JSON preview (click to expand)
-   - (Optional) Copy JSON to clipboard
-5. **Commit Changes**:
-   - (Optional) Enable "Dry run" to test without committing
-   - Click "Commit to GitHub"
-   - If variables haven't changed, commit is automatically skipped
-   - If committed, you'll see a link to the updated file
+In Figma Desktop, run the plugin from the Plugins menu.
+
+### Settings Tab
+
+Configure your GitHub repository and authentication:
+
+#### Configure Repository
+
+- Enter GitHub owner (username or organization)
+- Enter repository name
+- Specify target branch (will be created if it doesn't exist)
+- (Optional) Specify folder path within the repo
+- Set output filename (must end with `.json`)
+
+#### Save Token
+
+- Paste your GitHub Personal Access Token
+- Click "Save GitHub Token"
+- Click "Validate" to verify access
+
+#### Advanced Options (Optional)
+
+- Add commit message prefix (e.g., `feat(tokens):`)
+- Enable dry run mode to test without committing
+
+### Export Tab
+
+Extract and commit your design tokens:
+
+#### Export Variables
+
+- Click "Export Variables" to extract all variables from the current Figma file
+- View export status and metadata (variable count, collection count)
+
+#### Commit Changes
+
+- Click "Commit to GitHub" (or "Dry Run" if enabled)
+- If variables haven't changed, commit is automatically skipped
+- If committed, you'll see a link to the updated file
+
+### Preview Tab
+
+Review your export before committing:
+
+#### Review Changes
+
+- View the exported DTCG JSON (expandable, with copy to clipboard)
+- Open "Diff Viewer" to see token-level changes (added/removed/changed)
+- Review changes before committing
 
 ### Commit Message Format
 
-> [!NOTE]
-> Since the plugin is still heavily under development, the commit message format will be changing in the lead up to the `v1.0.0` release, as it presently hard-codes the `chore(design)` conventional commit prefix (often causing duplication when a user-defined prefix is added).
+Commit messages are automatically generated with the following format:
 
 ```text
-[<prefix>] chore(design): update Figma variables (<count> vars, <collections> collections) - <timestamp>
+[<prefix>] update Figma variables (<count> vars, <collections> collections) - <timestamp>
 ```
 
 Example with prefix:
 
 ```text
-feat(tokens): chore(design): update Figma variables (128 vars, 7 collections) - 2025-01-15T10:30:00.123Z
+feat(tokens): update Figma variables (128 vars, 7 collections) - 2025-01-15T10:30:00.123Z
 ```
 
 Example without prefix:
 
 ```text
-chore(design): update Figma variables (42 vars, 3 collections) - 2025-01-15T10:30:00.123Z
+update Figma variables (42 vars, 3 collections) - 2025-01-15T10:30:00.123Z
 ```
 
 ## How It Works
@@ -198,7 +267,7 @@ chore(design): update Figma variables (42 vars, 3 collections) - 2025-01-15T10:3
 The plugin uses SHA-256 content hashing to detect changes:
 
 1. **Local Cache**: Stores hash of last export to skip unnecessary network calls
-2. **Remote Comparison**: Compares with `meta.contentHash` in remote file
+2. **Remote Comparison**: Compares with `$extensions.com.figma.contentHash` in remote file
 3. **Fallback**: If remote file lacks hash (manual edits), recomputes hash for comparison
 4. **Skip Logic**: Only commits if content actually changed
 
@@ -233,38 +302,76 @@ If a 409 conflict occurs (file modified by another process):
 
 ```text
 src/
-├── plugin.ts                    # Main plugin logic (Figma sandbox)
-├── messaging.ts                 # Type-safe UI ↔ Plugin communication
+├── plugin.ts                   # Main plugin logic (Figma sandbox)
+├── messaging.ts                # Type-safe UI ↔ Plugin communication
 ├── export/
-│   ├── buildVariablesJson.ts   # Variable extraction & JSON building
+│   ├── buildDtcgJson.ts        # DTCG-compliant variable extraction
+│   ├── buildVariablesJson.ts   # Legacy format (deprecated)
 │   └── hash.ts                 # Pure JavaScript SHA-256 implementation
 ├── github/
 │   └── githubClient.ts         # GitHub API client with base64 encoding
+├── shared/
+│   ├── dtcg-types.ts           # DTCG type definitions
+│   └── types.ts                # Legacy type definitions
 ├── ui/
-│   ├── index.tsx               # React UI component
-│   ├── styles.css              # UI styling
-│   └── components/             # Reusable UI components
+│   ├── index.tsx               # Preact UI entry point
+│   ├── components/             # UI components
+│   │   ├── export/             # Export tab components
+│   │   ├── preview/            # Preview tab components
+│   │   ├── settings/           # Settings tab components
+│   │   └── layout/             # Tab layout components
+│   ├── context/                # Preact context providers
+│   └── hooks/                  # Custom Preact hooks
 └── util/
+    ├── colorUtils.ts           # DTCG color conversion utilities
+    ├── dtcgUtils.ts            # DTCG format utilities
     ├── stableStringify.ts      # Deterministic JSON serialization
-    └── validation.ts           # Input validation helpers
+    ├── validation.ts           # Input validation helpers
+    └── retry.ts                # Retry logic for API calls
 ```
 
 ### Build Commands
 
 ```bash
-# Development mode (watch for changes)
-npm run watch
+# Development mode (watch for changes - both UI and plugin)
+npm run dev
+
+# Watch UI only
+npm run dev:ui
+
+# Watch plugin only
+npm run dev:plugin
 
 # Production build
 npm run build
 
-# Test deterministic hashing
-npm run test:determinism
+# Create release package (ZIP file)
+npm run package
+
+# Run tests
+npm test
+
+# Run tests with UI
+npm test:ui
+
+# Run tests with coverage
+npm test:coverage
+
+# Type checking
+npm run type-check
+
+# Linting
+npm run lint
+npm run lint:fix
+
+# Formatting
+npm run format
+npm run format:check
 ```
 
 ## Support & Contributing
 
-For issues or questions, please open an issue on GitHub.
+For issues or questions, please open an issue on [GitHub](https://github.com/findyourexit/figgit/issues).
 
 > [!NOTE]
 > Developer documentation is coming soon (including contribution guidelines).
@@ -276,6 +383,14 @@ All contributions welcome! To contribute to the project, please follow the usual
 3. Make your changes
 4. Test thoroughly in Figma Desktop
 5. Submit a pull request
+
+### Technology Stack
+
+- **Language**: TypeScript `5.4`
+- **UI Framework**: Preact with [@create-figma-plugin/ui](https://github.com/yuanqing/create-figma-plugin) components
+- **Build Tools**: Vite (UI), esbuild (plugin)
+- **Testing**: Vitest with jsdom
+- **Code Quality**: ESLint, Prettier, Husky, lint-staged
 
 ## License
 
