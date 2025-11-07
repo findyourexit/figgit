@@ -7,7 +7,7 @@
 
 import { h, FunctionComponent } from 'preact';
 import { useState, useCallback } from 'preact/hooks';
-import { Disclosure, Stack, Textbox, Text, Button, VerticalSpace } from '@create-figma-plugin/ui';
+import { Disclosure, Stack, Textbox, Text, Button } from '@create-figma-plugin/ui';
 import { usePlugin } from '../../context/PluginContext';
 
 export const RepositoryDisclosure: FunctionComponent = () => {
@@ -76,8 +76,6 @@ export const RepositoryDisclosure: FunctionComponent = () => {
         >
           <Text>Filename</Text>
         </Textbox>
-
-        <VerticalSpace space="small" />
 
         <Button onClick={handleSaveSettings} fullWidth>
           Save Repository Settings
