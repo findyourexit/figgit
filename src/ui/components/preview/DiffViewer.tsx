@@ -1,18 +1,3 @@
-/**
- * DiffViewer Component
- *
- * Displays a token-level diff between the local DTCG export and the remote
- * file stored in GitHub. Helps users understand what changes will be committed
- * before they commit.
- *
- * Features:
- * - Automatically fetches remote data when opened
- * - Recursively traverses nested DTCG token structure
- * - Categorizes changes as added, removed, or changed
- * - Shows counts and first 10 items per category
- * - Handles loading, error, and "no remote file" states
- */
-
 import { h, FunctionComponent } from 'preact';
 import { useEffect, useMemo } from 'preact/hooks';
 import {
@@ -23,134 +8,50 @@ import {
   Banner,
   LoadingIndicator,
   IconInfoSmall24,
-  VerticalSpace,
 } from '@create-figma-plugin/ui';
 import { usePlugin } from '../../context/PluginContext';
 import { stableStringify } from '../../../util/stableStringify';
+import type { ExportDocument } from '../../../types/export';
+import type { FigmaNativeExportDocument } from '../../../shared/figma-native-types';
 import styles from './DiffViewer.module.css';
 
-/**
- * Summary counts of changes detected in the diff.
- */
 interface DiffCounts {
-  /** Number of tokens added (present in local but not remote) */
   added: number;
-  /** Number of tokens removed (present in remote but not local) */
   removed: number;
-  /** Number of tokens changed (present in both but with different values) */
   changed: number;
 }
 
-/**
- * Represents a single token change in the diff.
- */
-interface TokenChange {
-  /** Dot-separated path to the token (e.g., "color.bg.primary") */
-  path: string;
-  /** Type of change detected */
-  type: 'added' | 'removed' | 'changed';
-  /** Token value before change (only present for 'changed' and 'removed') */
-  before?: unknown;
-  /** Token value after change (only present for 'changed' and 'added') */
-  after?: unknown;
+interface DocumentDiffResult {
+  doc: ExportDocument;
+  counts: DiffCounts;
+  added: string[];
+  removed: string[];
+  changed: string[];
+  remoteMissing: boolean;
+  error?: string;
 }
 
 export const DiffViewer: FunctionComponent = () => {
   const { exportState, remoteDataState, fetchRemoteData, settings } = usePlugin();
 
-  // Fetch remote data on mount if not already fetched
   useEffect(() => {
-    if (settings && !remoteDataState.loading && !remoteDataState.fetched) {
-      fetchRemoteData();
+    if (
+      settings &&
+      exportState.data &&
+      exportState.data.documents.length &&
+      !remoteDataState.loading &&
+      !remoteDataState.fetched
+    ) {
+      const paths = exportState.data.documents.map((doc) => doc.relativePath);
+      fetchRemoteData(paths);
     }
-  }, [settings, remoteDataState.loading, remoteDataState.fetched, fetchRemoteData]);
-
-  /**
-   * Computes the diff between local and remote DTCG data.
-   *
-   * This memoized calculation:
-   * 1. Recursively collects all token paths from both local and remote data
-   * 2. Compares tokens using stable JSON serialization
-   * 3. Categorizes changes as added, removed, or changed
-   * 4. Returns structured diff data for rendering
-   *
-   * Re-runs only when local or remote data changes.
-   */
-  const diff = useMemo(() => {
-    if (!exportState.data || !remoteDataState.data) return null;
-
-    const changes: TokenChange[] = [];
-
-    /**
-     * Recursively walks the DTCG nested structure and collects all token paths.
-     *
-     * DTCG tokens are identified by the presence of a `$value` property.
-     * Groups are identified by nested objects without `$value`.
-     *
-     * @param obj - Object to traverse (token group or root)
-     * @param prefix - Current path prefix for nested traversal
-     * @returns Map of token path → token object
-     */
-    const collectTokenPaths = (obj: Record<string, unknown>, prefix = ''): Map<string, unknown> => {
-      const tokens = new Map<string, unknown>();
-
-      for (const [key, value] of Object.entries(obj)) {
-        // Skip DTCG metadata keys ($extensions, $type, etc.)
-        if (key.startsWith('$')) continue;
-
-        const path = prefix ? `${prefix}.${key}` : key;
-
-        if (value && typeof value === 'object') {
-          // Check if this is a token (has $value) or a group
-          if ('$value' in value) {
-            tokens.set(path, value);
-          } else {
-            // It's a group, recurse into children
-
-            const nested = collectTokenPaths(value as Record<string, unknown>, path);
-            nested.forEach((v, k) => tokens.set(k, v));
-          }
-        }
-      }
-
-      return tokens;
-    };
-
-    // Collect all token paths from both local and remote data
-    const localTokens = collectTokenPaths(exportState.data as Record<string, unknown>);
-    const remoteTokens = collectTokenPaths(remoteDataState.data as Record<string, unknown>);
-
-    // Find added tokens (present in local but not in remote)
-    localTokens.forEach((value, path) => {
-      if (!remoteTokens.has(path)) {
-        changes.push({ path, type: 'added', after: value });
-      } else {
-        // Token exists in both - check if value changed
-        const remoteValue = remoteTokens.get(path);
-        const localStr = stableStringify(value);
-        const remoteStr = stableStringify(remoteValue);
-        if (localStr !== remoteStr) {
-          changes.push({ path, type: 'changed', before: remoteValue, after: value });
-        }
-      }
-    });
-
-    // Find removed tokens (present in remote but not in local)
-    remoteTokens.forEach((value, path) => {
-      if (!localTokens.has(path)) {
-        changes.push({ path, type: 'removed', before: value });
-      }
-    });
-
-    // Calculate summary counts by type
-    const counts: DiffCounts = {
-      added: changes.filter((c) => c.type === 'added').length,
-      removed: changes.filter((c) => c.type === 'removed').length,
-      changed: changes.filter((c) => c.type === 'changed').length,
-    };
-
-    return { changes, counts };
-  }, [exportState.data, remoteDataState.data]);
+  }, [
+    settings,
+    exportState.data,
+    remoteDataState.loading,
+    remoteDataState.fetched,
+    fetchRemoteData,
+  ]);
 
   if (!exportState.data) {
     return (
@@ -161,7 +62,7 @@ export const DiffViewer: FunctionComponent = () => {
   }
 
   if (remoteDataState.loading) {
-    return <LoadingIndicator>Fetching remote file...</LoadingIndicator>;
+    return <LoadingIndicator>Fetching remote files...</LoadingIndicator>;
   }
 
   if (remoteDataState.error) {
@@ -172,117 +73,287 @@ export const DiffViewer: FunctionComponent = () => {
     );
   }
 
-  if (!remoteDataState.data) {
-    return (
-      <Banner icon={<IconInfoSmall24 />}>
-        <Text>Variables haven't been committed yet. All exported variables will be additions.</Text>
-      </Banner>
-    );
-  }
+  const diffs = useMemo(() => {
+    if (!exportState.data) return [];
+    return exportState.data.documents.map((doc) => {
+      const remote = remoteDataState.files.find((file) => file.path === doc.relativePath);
+      return computeDocumentDiff(doc, remote);
+    });
+  }, [exportState.data, remoteDataState.files]);
 
-  if (
-    !diff ||
-    (diff.counts.added === 0 && diff.counts.removed === 0 && diff.counts.changed === 0)
-  ) {
+  const hasAnyChanges = diffs.some(
+    (diff) =>
+      diff.remoteMissing ||
+      diff.error ||
+      diff.counts.added ||
+      diff.counts.removed ||
+      diff.counts.changed
+  );
+
+  if (!hasAnyChanges) {
     return (
       <Banner variant="success" icon={<IconInfoSmall24 />}>
-        <Text>No changes - local and remote are identical</Text>
+        <Text>No changes - local and remote files are identical</Text>
       </Banner>
     );
   }
 
-  const addedTokens = diff.changes.filter((c) => c.type === 'added');
-  const removedTokens = diff.changes.filter((c) => c.type === 'removed');
-  const changedTokens = diff.changes.filter((c) => c.type === 'changed');
-
   return (
-    <Stack space="small">
-      <div>
-        <Text>
-          <Bold>Diff Preview</Bold>
-        </Text>
-        <VerticalSpace space="extraSmall" />
-        <Text>
-          <Muted>
-            {diff.counts.added} added · {diff.counts.removed} removed · {diff.counts.changed}{' '}
-            changed
-          </Muted>
-        </Text>
-      </div>
-
-      <div className={styles.diffContent}>
-        {addedTokens.length > 0 && (
-          <div className={styles.diffSection}>
-            <Text>
-              <Bold className={styles.addedLabel}>+ Added ({addedTokens.length})</Bold>
-            </Text>
-            <ul className={styles.tokenList}>
-              {addedTokens.slice(0, 10).map((change) => (
-                <li key={change.path} className={styles.addedItem}>
-                  <Text>
-                    <Muted>+ {change.path}</Muted>
-                  </Text>
-                </li>
-              ))}
-              {addedTokens.length > 10 && (
-                <li className={styles.moreItem}>
-                  <Text>
-                    <Muted>... and {addedTokens.length - 10} more</Muted>
-                  </Text>
-                </li>
-              )}
-            </ul>
-          </div>
-        )}
-
-        {changedTokens.length > 0 && (
-          <div className={styles.diffSection}>
-            <Text>
-              <Bold className={styles.changedLabel}>~ Changed ({changedTokens.length})</Bold>
-            </Text>
-            <ul className={styles.tokenList}>
-              {changedTokens.slice(0, 10).map((change) => (
-                <li key={change.path} className={styles.changedItem}>
-                  <Text>
-                    <Muted>~ {change.path}</Muted>
-                  </Text>
-                </li>
-              ))}
-              {changedTokens.length > 10 && (
-                <li className={styles.moreItem}>
-                  <Text>
-                    <Muted>... and {changedTokens.length - 10} more</Muted>
-                  </Text>
-                </li>
-              )}
-            </ul>
-          </div>
-        )}
-
-        {removedTokens.length > 0 && (
-          <div className={styles.diffSection}>
-            <Text>
-              <Bold className={styles.removedLabel}>- Removed ({removedTokens.length})</Bold>
-            </Text>
-            <ul className={styles.tokenList}>
-              {removedTokens.slice(0, 10).map((change) => (
-                <li key={change.path} className={styles.removedItem}>
-                  <Text>
-                    <Muted>- {change.path}</Muted>
-                  </Text>
-                </li>
-              ))}
-              {removedTokens.length > 10 && (
-                <li className={styles.moreItem}>
-                  <Text>
-                    <Muted>... and {removedTokens.length - 10} more</Muted>
-                  </Text>
-                </li>
-              )}
-            </ul>
-          </div>
-        )}
-      </div>
+    <Stack space="medium">
+      {diffs.map((diff) => (
+        <DocumentDiffSection key={diff.doc.id} diff={diff} />
+      ))}
     </Stack>
   );
 };
+
+function DocumentDiffSection({ diff }: { diff: DocumentDiffResult }) {
+  return (
+    <div className={styles.diffSection}>
+      <Stack space="extraSmall">
+        <Text>
+          <Bold>{diff.doc.label}</Bold>
+        </Text>
+        <Text>
+          <Muted>{diff.doc.relativePath}</Muted>
+        </Text>
+      </Stack>
+
+      {diff.error && (
+        <Banner variant="warning" icon={<IconInfoSmall24 />}>
+          <Text>{diff.error}</Text>
+        </Banner>
+      )}
+
+      {!diff.error && diff.remoteMissing && (
+        <Banner icon={<IconInfoSmall24 />}>
+          <Text>Remote file not found. Committing will create this file.</Text>
+        </Banner>
+      )}
+
+      {!diff.error &&
+        !diff.remoteMissing &&
+        diff.counts.added === 0 &&
+        diff.counts.removed === 0 &&
+        diff.counts.changed === 0 && (
+          <Banner variant="success" icon={<IconInfoSmall24 />}>
+            <Text>No changes detected for this document</Text>
+          </Banner>
+        )}
+
+      {!diff.error && (diff.counts.added || diff.counts.removed || diff.counts.changed) ? (
+        <div className={styles.diffContent}>
+          {diff.added.length > 0 && (
+            <div>
+              <Text>
+                <Bold className={styles.addedLabel}>+ Added ({diff.added.length})</Bold>
+              </Text>
+              <ul className={styles.tokenList}>
+                {diff.added.slice(0, 10).map((path) => (
+                  <li key={`added-${path}`} className={styles.addedItem}>
+                    <Text>
+                      <Muted>+ {path}</Muted>
+                    </Text>
+                  </li>
+                ))}
+                {diff.added.length > 10 && (
+                  <li className={styles.moreItem}>
+                    <Text>
+                      <Muted>... and {diff.added.length - 10} more</Muted>
+                    </Text>
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+
+          {diff.changed.length > 0 && (
+            <div>
+              <Text>
+                <Bold className={styles.changedLabel}>~ Changed ({diff.changed.length})</Bold>
+              </Text>
+              <ul className={styles.tokenList}>
+                {diff.changed.slice(0, 10).map((path) => (
+                  <li key={`changed-${path}`} className={styles.changedItem}>
+                    <Text>
+                      <Muted>~ {path}</Muted>
+                    </Text>
+                  </li>
+                ))}
+                {diff.changed.length > 10 && (
+                  <li className={styles.moreItem}>
+                    <Text>
+                      <Muted>... and {diff.changed.length - 10} more</Muted>
+                    </Text>
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+
+          {diff.removed.length > 0 && (
+            <div>
+              <Text>
+                <Bold className={styles.removedLabel}>- Removed ({diff.removed.length})</Bold>
+              </Text>
+              <ul className={styles.tokenList}>
+                {diff.removed.slice(0, 10).map((path) => (
+                  <li key={`removed-${path}`} className={styles.removedItem}>
+                    <Text>
+                      <Muted>- {path}</Muted>
+                    </Text>
+                  </li>
+                ))}
+                {diff.removed.length > 10 && (
+                  <li className={styles.moreItem}>
+                    <Text>
+                      <Muted>... and {diff.removed.length - 10} more</Muted>
+                    </Text>
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function computeDocumentDiff(
+  doc: ExportDocument,
+  remote?: { path: string; data?: unknown | null; error?: string }
+): DocumentDiffResult {
+  if (remote?.error) {
+    return {
+      doc,
+      counts: { added: 0, removed: 0, changed: 0 },
+      added: [],
+      removed: [],
+      changed: [],
+      remoteMissing: false,
+      error: `Failed to load remote file (${remote.error})`,
+    };
+  }
+
+  const remoteMissing = !remote || remote.data === null;
+  if (doc.format === 'dtcg') {
+    const localMap = flattenDtcgTokens(doc.data as Record<string, unknown>);
+    const remoteMap =
+      !remoteMissing && isObject(remote?.data)
+        ? flattenDtcgTokens(remote?.data as Record<string, unknown>)
+        : new Map<string, unknown>();
+    const diff = diffMaps(localMap, remoteMap);
+    return {
+      ...diff,
+      doc,
+      remoteMissing: remoteMissing && remote?.error === undefined,
+      error: undefined,
+    };
+  }
+
+  const localNative = doc.data as FigmaNativeExportDocument;
+  const localMap = flattenNativeVariables(localNative);
+  const remoteMap =
+    !remoteMissing && isFigmaNativeExportDocument(remote?.data)
+      ? flattenNativeVariables(remote?.data)
+      : new Map<string, unknown>();
+  const diff = diffMaps(localMap, remoteMap);
+  return {
+    ...diff,
+    doc,
+    remoteMissing: remoteMissing && remote?.error === undefined,
+    error: undefined,
+  };
+}
+
+function diffMaps(
+  localMap: Map<string, unknown>,
+  remoteMap: Map<string, unknown>
+): Pick<DocumentDiffResult, 'counts' | 'added' | 'removed' | 'changed'> {
+  const added: string[] = [];
+  const removed: string[] = [];
+  const changed: string[] = [];
+
+  localMap.forEach((value, path) => {
+    if (!remoteMap.has(path)) {
+      added.push(path);
+      return;
+    }
+    const remoteValue = remoteMap.get(path);
+    if (stableStringify(value) !== stableStringify(remoteValue)) {
+      changed.push(path);
+    }
+  });
+
+  remoteMap.forEach((_, path) => {
+    if (!localMap.has(path)) {
+      removed.push(path);
+    }
+  });
+
+  return {
+    counts: { added: added.length, removed: removed.length, changed: changed.length },
+    added,
+    removed,
+    changed,
+  };
+}
+
+function flattenDtcgTokens(obj: Record<string, unknown>, prefix = ''): Map<string, unknown> {
+  const tokens = new Map<string, unknown>();
+  for (const [key, value] of Object.entries(obj)) {
+    if (key.startsWith('$')) continue;
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (value && typeof value === 'object') {
+      if ('$value' in (value as Record<string, unknown>)) {
+        tokens.set(path, value);
+      } else {
+        const nested = flattenDtcgTokens(value as Record<string, unknown>, path);
+        nested.forEach((tokenValue, tokenPath) => tokens.set(tokenPath, tokenValue));
+      }
+    }
+  }
+  return tokens;
+}
+
+function flattenNativeVariables(doc: FigmaNativeExportDocument): Map<string, unknown> {
+  const map = new Map<string, unknown>();
+  for (const collection of doc.collections) {
+    const base = collection.name;
+    collection.variables.forEach((variable) => {
+      const relativePath = variable.path || variable.name;
+      map.set(`${base}/${relativePath}`, variable.valueByMode);
+    });
+  }
+  return map;
+}
+
+function isFigmaNativeExportDocument(value: unknown): value is FigmaNativeExportDocument {
+  if (!isObject(value)) {
+    return false;
+  }
+
+  const maybeDoc = value as Partial<FigmaNativeExportDocument>;
+  if (!Array.isArray(maybeDoc.collections)) {
+    return false;
+  }
+
+  const countsAreNumbers =
+    typeof maybeDoc.collectionsCount === 'number' && typeof maybeDoc.variablesCount === 'number';
+  if (!countsAreNumbers) {
+    return false;
+  }
+
+  return maybeDoc.collections.every((collection) =>
+    Boolean(
+      isObject(collection) &&
+      typeof collection.name === 'string' &&
+      Array.isArray(collection.variables)
+    )
+  );
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object');
+}

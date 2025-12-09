@@ -18,8 +18,6 @@ import {
   IconApprovedCheckmark24,
 } from '@create-figma-plugin/ui';
 import { usePlugin } from '../../context/PluginContext';
-import { ExportRoot } from '../../../shared/types';
-import { DtcgRoot, DtcgFigmaExtensions } from '../../../shared/dtcg-types';
 
 export const StatusSummary: FunctionComponent = () => {
   const { exportState, settings } = usePlugin();
@@ -56,22 +54,12 @@ export const StatusSummary: FunctionComponent = () => {
     );
   }
 
-  // Extract metadata from either legacy or DTCG format
-  let variablesCount = 0;
-  let collectionsCount = 0;
-
-  if ('meta' in exportState.data) {
-    // Legacy format (ExportRoot)
-    const data = exportState.data as ExportRoot;
-    variablesCount = data.meta.variablesCount;
-    collectionsCount = data.meta.collectionsCount;
-  } else if ('$extensions' in exportState.data && exportState.data.$extensions?.['com.figma']) {
-    // DTCG format (DtcgRoot)
-    const data = exportState.data as DtcgRoot;
-    const figmaExt = data.$extensions?.['com.figma'] as DtcgFigmaExtensions | undefined;
-    variablesCount = figmaExt?.variablesCount ?? 0;
-    collectionsCount = figmaExt?.collectionsCount ?? 0;
-  }
+  const bundle = exportState.data;
+  const variablesCount = bundle?.summary.variablesCount ?? 0;
+  const collectionsCount = bundle?.summary.collectionsCount ?? 0;
+  const formatLabel = bundle?.summary.format === 'figma-native' ? 'Figma-native' : 'DTCG';
+  const exportTypeLabel =
+    bundle?.summary.exportType === 'perCollection' ? 'Per collection' : 'Single file';
 
   return (
     <Stack space="small">
@@ -93,6 +81,15 @@ export const StatusSummary: FunctionComponent = () => {
           <Text>Collections:</Text>
           <Text>
             <Bold>{collectionsCount}</Bold>
+          </Text>
+        </Inline>
+
+        <Inline space="small">
+          <Text>Format:</Text>
+          <Text>
+            <Muted>
+              {formatLabel} · {exportTypeLabel}
+            </Muted>
           </Text>
         </Inline>
 

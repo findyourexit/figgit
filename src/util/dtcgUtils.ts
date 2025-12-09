@@ -6,7 +6,15 @@
 
 import { DtcgTokenType, DtcgTokenValue, DtcgDimensionValue } from '../shared/dtcg-types';
 import { convertColorToDtcg } from './colorUtils';
-import { VariableModeValue } from '../shared/types';
+
+/**
+ * Normalized representation of a Figma variable mode value used by DTCG utilities.
+ */
+export interface VariableModeValue {
+  type: 'COLOR' | 'STRING' | 'NUMBER' | 'BOOLEAN' | 'ALIAS';
+  value?: string | number | boolean | { r: number; g: number; b: number; a: number };
+  refVariableId?: string;
+}
 
 /**
  * Map of Figma variable IDs to DTCG token paths

@@ -4,7 +4,8 @@
   "api": "1.0.0",
   "main": "dist/plugin.js",
   "ui": "dist/index.html",
-  "editorType": ["figma"],
+  "editorType": ["figma","dev"],
+  "capabilities": ["inspect", "vscode"],
   "networkAccess": {
     "allowedDomains": ["https://api.github.com"],
     "reasoning": "Need to push variable JSON to GitHub repository contents API"

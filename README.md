@@ -15,17 +15,19 @@
 ![DTCG](https://img.shields.io/badge/DTCG-v2025.10-blue)
 ![Code Style](https://img.shields.io/badge/code_style-prettier-ff69b4.svg)
 
-A Figma plugin that extracts design variables (colors, typography, spacing, etc.) and commits them as [DTCG-compliant](https://www.designtokens.org/) JSON to a GitHub repository.
+A Figma plugin that extracts design variables (colors, typography, spacing, etc.) and commits them to GitHub as either [DTCG-compliant](https://www.designtokens.org/) design tokens or a Figma-native JSON structure that mirrors the Variables UI.
 
 ## Features
 
 - **DTCG-Compliant Export**: Exports design tokens following the [Design Tokens Community Group (DTCG) specification v2025.10](https://www.designtokens.org/tr/2025.10/)
+- **Figma-Native Export**: Generate JSON that preserves collections, groups, modes, and IDs exactly as shown in the Variables table (per collection or aggregated)
+- **Flexible Output**: Export a single JSON or automatically split one file per collection with deterministic file naming
 - **One-Click Export**: Extract all Figma variables with full metadata
 - **Tab-Based Interface**: Organized UI with Export, Preview, and Settings tabs
 - **Direct GitHub Integration**: Commit directly to any branch (creates branch if needed)
 - **Smart Change Detection**: SHA-256 content hashing prevents redundant commits
 - **Diff Preview**: See token-level changes before committing (added/modified/removed)
-- **JSON Preview**: View and copy exported DTCG JSON directly in the plugin
+- **JSON Preview**: View and copy any exported JSON document (DTCG or Figma-native) directly in the plugin
 - **Dry Run Mode**: Test without committing to verify changes
 - **Automatic Conflict Resolution**: Auto-retry on 409 conflicts
 - **Remote Variable Support**: Handles references to external/library variables
@@ -49,15 +51,15 @@ A Figma plugin that extracts design variables (colors, typography, spacing, etc.
 > [!TIP]
 > The plugin will remember your settings between sessions. Use the "Settings" tab to configure your repository and save your GitHub token for easy reuse.
 
-## What's in this package?
+## Release Bundle Contents
 
-This development package contains three files:
+Each release ships as a folder containing `manifest.json` plus a compiled `dist/` directory. Keep the structure intact when importing the plugin:
 
-- `manifest.json` - Plugin configuration (required for import)
-- `plugin.js` - The plugin's backend code
-- `index.html` - The plugin's user interface
+- `manifest.json` – References the compiled assets inside `dist/`
+- `dist/plugin.js` – Bundled plugin code that runs in the Figma sandbox
+- `dist/index.html` (and related assets) – Bundled UI served inside the plugin iframe
 
-All three files must stay together in the same folder.
+If you build from source (`npm run build`), the same files are generated locally before packaging.
 
 ## Updating
 
@@ -69,7 +71,7 @@ When a new version is available:
 
 ## JSON Output Schema
 
-The plugin exports design tokens in [DTCG (Design Tokens Community Group) format v2025.10](https://www.designtokens.org/tr/2025.10/), a standardized format for exchanging design tokens between tools.
+FigGit can export either [DTCG (Design Tokens Community Group) format v2025.10](https://www.designtokens.org/tr/2025.10/) or a Figma-native JSON structure that mirrors the Variables table. Choose the format and document strategy (single file vs per-collection) from **Settings → Export Options**.
 
 ### DTCG Format Structure
 
@@ -152,6 +154,77 @@ Example DTCG export:
 | `boolean`    | BOOLEAN                     | `true`                           |
 | `fontFamily` | STRING (font context)       | `"Inter"`                        |
 
+### Figma-Native Format Structure
+
+The Figma-native export mirrors collections, groups, and variables exactly as they appear in the Variables table. Each JSON document includes deterministic metadata so change detection and Git diffs continue to work even when splitting into multiple files.
+
+- **Top-level metadata**: `collectionsCount`, `variablesCount`, `contentHash`, `exportedAt`, `fileName`, `pluginVersion`, `exportFormat`, `exportType`
+- **Per-collection docs**: include `collectionId`, `collectionName`, and `collectionVariablesCount`
+- **Groups**: Real Variable groups (e.g., `Brand / Surfacing / Primary`) preserved as nested `groups`
+- **Variables**: Carry Figma IDs, names (leaf node), full `path`, scopes, code syntax, and per-mode `valueByMode`
+- **Modes**: Stored once per collection and referenced via `modeId`
+
+Example Figma-native export (per collection):
+
+```json
+{
+  "collectionsCount": 1,
+  "variablesCount": 12,
+  "contentHash": "c19f6a...",
+  "exportedAt": "2025-12-03T23:21:11.219Z",
+  "fileName": "Katalyst Design System",
+  "pluginVersion": "0.2.0",
+  "exportFormat": "figma-native",
+  "exportType": "perCollection",
+  "collectionId": "889:34",
+  "collectionName": "Core Colors",
+  "collections": [
+    {
+      "id": "889:34",
+      "name": "Core Colors",
+      "modes": [
+        { "id": "889:56", "name": "Light" },
+        { "id": "889:57", "name": "Dark" }
+      ],
+      "groups": [
+        {
+          "id": "889:34:brand",
+          "name": "Brand",
+          "path": "Core Colors/Brand",
+          "groups": [],
+          "variables": [
+            {
+              "id": "var-brand-primary",
+              "name": "Primary",
+              "path": "Brand/Primary",
+              "type": "color",
+              "valueByMode": {
+                "889:56": { "value": "#0F62FE" },
+                "889:57": { "value": "#78A9FF" }
+              }
+            }
+          ]
+        }
+      ],
+      "variables": [
+        {
+          "id": "var-brand-primary",
+          "name": "Primary",
+          "path": "Brand/Primary",
+          "type": "color",
+          "valueByMode": {
+            "889:56": { "value": "#0F62FE" },
+            "889:57": { "value": "#78A9FF" }
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+Use **single-file** export when you want one consolidated JSON, or switch to **per-collection** to create deterministic files such as `tokens/core-colors.json`, `tokens/spacing.json`, etc.
+
 ## Installation
 
 ### Requirements
@@ -232,7 +305,7 @@ Extract and commit your design tokens:
 
 - Click "Commit to GitHub" (or "Dry Run" if enabled)
 - If variables haven't changed, commit is automatically skipped
-- If committed, you'll see a link to the updated file
+- If committed, you'll see a link to the GitHub commit that contains the updated file(s)
 
 ### Preview Tab
 
@@ -240,7 +313,7 @@ Review your export before committing:
 
 #### Review Changes
 
-- View the exported DTCG JSON (expandable, with copy to clipboard)
+- Browse each exported JSON document (expandable, with copy to clipboard)
 - Open "Diff Viewer" to see token-level changes (added/removed/changed)
 - Review changes before committing
 
@@ -310,13 +383,11 @@ src/
 ├── messaging.ts                # Type-safe UI ↔ Plugin communication
 ├── export/
 │   ├── buildDtcgJson.ts        # DTCG-compliant variable extraction
-│   ├── buildVariablesJson.ts   # Legacy format (deprecated)
 │   └── hash.ts                 # Pure JavaScript SHA-256 implementation
 ├── github/
 │   └── githubClient.ts         # GitHub API client with base64 encoding
 ├── shared/
-│   ├── dtcg-types.ts           # DTCG type definitions
-│   └── types.ts                # Legacy type definitions
+│   └── dtcg-types.ts           # DTCG type definitions
 ├── ui/
 │   ├── index.tsx               # Preact UI entry point
 │   ├── components/             # UI components

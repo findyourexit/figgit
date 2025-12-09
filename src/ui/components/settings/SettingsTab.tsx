@@ -9,6 +9,7 @@ import { h, FunctionComponent } from 'preact';
 import { Container, VerticalSpace } from '@create-figma-plugin/ui';
 import { RepositoryDisclosure } from './RepositoryDisclosure';
 import { TokenDisclosure } from './TokenDisclosure';
+import { ExportOptionsDisclosure } from './ExportOptionsDisclosure';
 import { AdvancedDisclosure } from './AdvancedDisclosure';
 
 export const SettingsTab: FunctionComponent = () => {
@@ -21,6 +22,10 @@ export const SettingsTab: FunctionComponent = () => {
       <VerticalSpace space="medium" />
 
       <TokenDisclosure />
+
+      <VerticalSpace space="medium" />
+
+      <ExportOptionsDisclosure />
 
       <VerticalSpace space="medium" />
 

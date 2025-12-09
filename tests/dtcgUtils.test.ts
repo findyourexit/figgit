@@ -17,7 +17,7 @@ import {
   convertValue,
   type VariablePathMap,
 } from '../src/util/dtcgUtils';
-import type { VariableModeValue } from '../src/shared/types';
+import type { VariableModeValue } from '../src/util/dtcgUtils';
 
 describe('shouldBeDimension', () => {
   it('returns true for FLOAT type with "width" in name', () => {

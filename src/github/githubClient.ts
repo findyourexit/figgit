@@ -43,6 +43,32 @@ export interface UpsertResult {
   commitSha?: string;
 }
 
+export interface FileCommitPayload {
+  /** File path within the repository */
+  path: string;
+  /** Raw string content of the file */
+  content: string;
+  /** Deterministic content hash embedded in the JSON */
+  contentHash: string;
+}
+
+export interface CommitFilesOptions {
+  owner: string;
+  repo: string;
+  branch: string;
+  token: string;
+  commitMessage: string;
+  files: FileCommitPayload[];
+}
+
+export interface CommitFilesResult {
+  updated: boolean;
+  skipped: boolean;
+  updatedPaths: string[];
+  url?: string;
+  commitSha?: string;
+}
+
 /**
  * Options for upserting a file to GitHub.
  */
@@ -332,6 +358,31 @@ export function fromBase64(str: string): string {
   return result;
 }
 
+function extractEmbeddedHashFromJsonContent(content: string): string | undefined {
+  try {
+    const parsed = JSON.parse(content) as Record<string, unknown>;
+    if (parsed && typeof parsed === 'object') {
+      if (typeof parsed.contentHash === 'string') {
+        return parsed.contentHash;
+      }
+      const meta = parsed.meta as Record<string, unknown> | undefined;
+      if (meta && typeof meta.contentHash === 'string') {
+        return meta.contentHash as string;
+      }
+      const extensions = parsed.$extensions as Record<string, unknown> | undefined;
+      if (extensions && typeof extensions === 'object') {
+        const figmaExt = extensions['com.figma'] as Record<string, unknown> | undefined;
+        if (figmaExt && typeof figmaExt['contentHash'] === 'string') {
+          return figmaExt['contentHash'] as string;
+        }
+      }
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return undefined;
+}
+
 /**
  * Creates or updates a file in a GitHub repository.
  *
@@ -364,15 +415,7 @@ export async function upsertFile(options: GitHubUpsertOptions): Promise<UpsertRe
   if (existing) {
     try {
       const decoded = fromBase64(existing.content);
-
-      // Try to parse JSON and extract embedded contentHash for smart comparison
-      let embeddedHash: string | undefined;
-      try {
-        const parsed = JSON.parse(decoded);
-        embeddedHash = parsed?.meta?.contentHash;
-      } catch {
-        // Ignore parse errors - file might not be JSON or might be corrupted
-      }
+      const embeddedHash = extractEmbeddedHashFromJsonContent(decoded);
 
       // If hashes match, content is identical - skip commit
       if (embeddedHash && embeddedHash === currentHash) {
@@ -426,8 +469,7 @@ export async function upsertFile(options: GitHubUpsertOptions): Promise<UpsertRe
         // Before retrying, check if content is still identical
         try {
           const decoded = fromBase64(latest.content);
-          const parsed = JSON.parse(decoded);
-          const embedded = parsed?.meta?.contentHash;
+          const embedded = extractEmbeddedHashFromJsonContent(decoded);
 
           if (embedded && embedded === currentHash) {
             // Content matches - someone else already committed the same change
@@ -457,4 +499,176 @@ export async function upsertFile(options: GitHubUpsertOptions): Promise<UpsertRe
 
   // Start the write attempt
   return attemptWrite(existing, 0);
+}
+
+export async function commitFiles(options: CommitFilesOptions): Promise<CommitFilesResult> {
+  const { owner, repo, branch, token, commitMessage, files } = options;
+
+  if (!files.length) {
+    return { updated: false, skipped: true, updatedPaths: [] };
+  }
+
+  await ensureBranch(owner, repo, branch, token);
+
+  const filesToUpdate = await filterFilesNeedingUpdate(owner, repo, branch, token, files);
+
+  if (!filesToUpdate.length) {
+    return { updated: false, skipped: true, updatedPaths: [] };
+  }
+
+  const headInfo = await getHeadInfo(owner, repo, branch, token);
+
+  const treeEntries = [] as Array<{ path: string; mode: string; type: string; sha: string }>;
+  for (const file of filesToUpdate) {
+    const blobSha = await createBlob(owner, repo, token, file.content);
+    treeEntries.push({ path: file.path, mode: '100644', type: 'blob', sha: blobSha });
+  }
+
+  const treeSha = await createTree(owner, repo, token, headInfo.treeSha, treeEntries);
+  const commit = await createCommit(owner, repo, token, commitMessage, treeSha, headInfo.commitSha);
+  await updateBranchRef(owner, repo, branch, token, commit.sha);
+
+  return {
+    updated: true,
+    skipped: false,
+    updatedPaths: filesToUpdate.map((file) => file.path),
+    url: `https://github.com/${owner}/${repo}/commit/${commit.sha}`,
+    commitSha: commit.sha,
+  };
+}
+
+async function filterFilesNeedingUpdate(
+  owner: string,
+  repo: string,
+  branch: string,
+  token: string,
+  files: FileCommitPayload[]
+): Promise<FileCommitPayload[]> {
+  const updates: FileCommitPayload[] = [];
+
+  for (const file of files) {
+    const existing = await getExistingFile(owner, repo, branch, file.path, token);
+    if (existing) {
+      try {
+        const decoded = fromBase64(existing.content);
+        const embeddedHash = extractEmbeddedHashFromJsonContent(decoded);
+        if (embeddedHash && embeddedHash === file.contentHash) {
+          continue;
+        }
+      } catch {
+        // Ignore parse errors and include file for update
+      }
+    }
+    updates.push(file);
+  }
+
+  return updates;
+}
+
+async function getHeadInfo(
+  owner: string,
+  repo: string,
+  branch: string,
+  token: string
+): Promise<{ commitSha: string; treeSha: string }> {
+  const refRes = await ghFetch(
+    `https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${branch}`,
+    token
+  );
+  if (!refRes.ok) {
+    throw new Error('Failed to read branch reference');
+  }
+  const refJson = await refRes.json();
+  const commitSha = refJson.object?.sha;
+  if (!commitSha) {
+    throw new Error('Invalid branch reference response');
+  }
+
+  const commitRes = await ghFetch(
+    `https://api.github.com/repos/${owner}/${repo}/git/commits/${commitSha}`,
+    token
+  );
+  if (!commitRes.ok) {
+    throw new Error('Failed to read commit metadata');
+  }
+  const commitJson = await commitRes.json();
+  const treeSha = commitJson.tree?.sha;
+  if (!treeSha) {
+    throw new Error('Commit missing tree information');
+  }
+
+  return { commitSha, treeSha };
+}
+
+async function createBlob(
+  owner: string,
+  repo: string,
+  token: string,
+  content: string
+): Promise<string> {
+  const res = await ghFetch(`https://api.github.com/repos/${owner}/${repo}/git/blobs`, token, {
+    method: 'POST',
+    body: JSON.stringify({ content, encoding: 'utf-8' }),
+  });
+  if (!res.ok) {
+    throw new Error('Failed to create blob');
+  }
+  const json = await res.json();
+  return json.sha as string;
+}
+
+async function createTree(
+  owner: string,
+  repo: string,
+  token: string,
+  baseTree: string,
+  entries: Array<{ path: string; mode: string; type: string; sha: string }>
+): Promise<string> {
+  const res = await ghFetch(`https://api.github.com/repos/${owner}/${repo}/git/trees`, token, {
+    method: 'POST',
+    body: JSON.stringify({ base_tree: baseTree, tree: entries }),
+  });
+  if (!res.ok) {
+    throw new Error('Failed to create tree');
+  }
+  const json = await res.json();
+  return json.sha as string;
+}
+
+async function createCommit(
+  owner: string,
+  repo: string,
+  token: string,
+  message: string,
+  treeSha: string,
+  parentSha: string
+): Promise<{ sha: string }> {
+  const res = await ghFetch(`https://api.github.com/repos/${owner}/${repo}/git/commits`, token, {
+    method: 'POST',
+    body: JSON.stringify({ message, tree: treeSha, parents: [parentSha] }),
+  });
+  if (!res.ok) {
+    throw new Error('Failed to create commit');
+  }
+  return (await res.json()) as { sha: string };
+}
+
+async function updateBranchRef(
+  owner: string,
+  repo: string,
+  branch: string,
+  token: string,
+  sha: string
+): Promise<void> {
+  const res = await ghFetch(
+    `https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${branch}`,
+    token,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ sha, force: false }),
+    }
+  );
+  if (!res.ok) {
+    throw new Error('Failed to update branch reference');
+  }
 }
