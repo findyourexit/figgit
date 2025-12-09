@@ -10,8 +10,7 @@
  * - Plugin → UI: Responses, notifications, and state updates
  */
 
-import { ExportRoot } from './shared/types';
-import { DtcgRoot } from './shared/dtcg-types';
+import type { ExportBundle, ExportFormat, ExportType } from './types/export';
 
 /**
  * Messages sent from the UI to the Plugin.
@@ -37,11 +36,11 @@ export type UIToPluginMessage =
   | { type: 'VALIDATE_TOKEN' }
   | {
       type: 'COMMIT_REQUEST';
-      exportData: ExportRoot | DtcgRoot;
+      exportBundle: ExportBundle;
       dryRun: boolean;
       commitPrefix: string;
     }
-  | { type: 'FETCH_REMOTE_EXPORT' } // Request the current remote export JSON (if file exists)
+  | { type: 'FETCH_REMOTE_EXPORT'; files: string[] }
   | { type: 'COPY_TO_CLIPBOARD'; text: string } // Copy text to clipboard
   | { type: 'NOTIFY'; level: 'info' | 'error'; message: string } // Display notification in Figma UI
   | { type: 'PING' };
@@ -57,15 +56,21 @@ export type UIToPluginMessage =
  * - COMMIT_RESULT: Result of GitHub commit operation
  * - FETCH_REMOTE_EXPORT_RESULT: Remote file contents or null if not found
  */
+export interface RemoteFileResult {
+  path: string;
+  data?: unknown | null;
+  error?: string;
+}
+
 export type PluginToUIMessage =
-  | { type: 'EXPORT_RESULT'; ok: true; data: ExportRoot | DtcgRoot }
+  | { type: 'EXPORT_RESULT'; ok: true; data: ExportBundle }
   | { type: 'EXPORT_RESULT'; ok: false; error: string }
   | { type: 'SETTINGS_RESPONSE'; payload: PersistedSettings & { tokenPresent: boolean } }
   | { type: 'NOTIFY'; level: 'info' | 'error'; message: string }
   | { type: 'TOKEN_VALIDATION'; ok: boolean; login?: string; error?: string }
   | { type: 'COMMIT_RESULT'; ok: true; skipped?: boolean; url?: string }
   | { type: 'COMMIT_RESULT'; ok: false; error: string }
-  | { type: 'FETCH_REMOTE_EXPORT_RESULT'; ok: true; data: ExportRoot | DtcgRoot | null }
+  | { type: 'FETCH_REMOTE_EXPORT_RESULT'; ok: true; files: RemoteFileResult[] }
   | { type: 'FETCH_REMOTE_EXPORT_RESULT'; ok: false; error: string };
 
 /**
@@ -91,6 +96,12 @@ export interface PersistedSettings {
   dryRun?: boolean;
   /** Last known content hash for change detection */
   lastHash?: string;
+  /** Map of repo-relative file paths to last known content hashes */
+  lastHashes?: Record<string, string>;
+  /** Preferred export format */
+  exportFormat?: ExportFormat;
+  /** Export type for figma-native format */
+  exportType?: ExportType;
 }
 
 /**
@@ -113,5 +124,8 @@ export function defaultSettings(): PersistedSettings {
     filename: 'variables.json',
     commitPrefix: '',
     dryRun: false,
+    exportFormat: 'dtcg',
+    exportType: 'singleFile',
+    lastHashes: {},
   };
 }

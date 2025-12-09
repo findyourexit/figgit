@@ -8,14 +8,13 @@
 import { h, FunctionComponent, createContext } from 'preact';
 import { useContext, useState, useEffect, useCallback } from 'preact/hooks';
 import { UIToPluginMessage, PluginToUIMessage, PersistedSettings } from '../../messaging';
-import { ExportRoot } from '../../shared/types';
-import { DtcgRoot } from '../../shared/dtcg-types';
+import { ExportBundle } from '../../types/export';
 
 export type NotificationType = 'success' | 'error' | 'warning' | 'info';
 
 export interface ExportState {
   loading: boolean;
-  data?: ExportRoot | DtcgRoot;
+  data?: ExportBundle;
   error?: string;
 }
 
@@ -27,13 +26,17 @@ export interface CommitState {
   error?: string;
 }
 
+export interface RemoteFileState {
+  path: string;
+  data?: unknown | null;
+  error?: string;
+}
+
 export interface RemoteDataState {
   loading: boolean;
-  /** Data from remote file. undefined = not fetched, null = fetched but doesn't exist, object = exists */
-  data?: ExportRoot | DtcgRoot | null;
-  error?: string;
-  /** Whether a fetch has been attempted (helps distinguish undefined from never-fetched) */
+  files: RemoteFileState[];
   fetched?: boolean;
+  error?: string;
 }
 
 interface PluginContextType {
@@ -49,12 +52,12 @@ interface PluginContextType {
 
   // Commit state
   commitState: CommitState;
-  startCommit: (exportData: ExportRoot | DtcgRoot, dryRun?: boolean, commitPrefix?: string) => void;
+  startCommit: (exportData: ExportBundle, dryRun?: boolean, commitPrefix?: string) => void;
   resetCommit: () => void;
 
   // Remote data state
   remoteDataState: RemoteDataState;
-  fetchRemoteData: () => void;
+  fetchRemoteData: (paths: string[]) => void;
 }
 
 const PluginContext = createContext<PluginContextType | undefined>(undefined);
@@ -90,7 +93,10 @@ export const PluginProvider: FunctionComponent<PluginProviderProps> = ({ childre
     success: false,
     skipped: false,
   });
-  const [remoteDataState, setRemoteDataState] = useState<RemoteDataState>({ loading: false });
+  const [remoteDataState, setRemoteDataState] = useState<RemoteDataState>({
+    loading: false,
+    files: [],
+  });
 
   const sendMessage = (message: UIToPluginMessage) => {
     parent.postMessage({ pluginMessage: message }, '*');
@@ -125,26 +131,27 @@ export const PluginProvider: FunctionComponent<PluginProviderProps> = ({ childre
     sendMessage({ type: 'REQUEST_EXPORT' });
   }, []);
 
-  const startCommit = useCallback(
-    (exportData: ExportRoot | DtcgRoot, dryRun = false, commitPrefix = '') => {
-      setCommitState({ inProgress: true, success: false, skipped: false });
-      sendMessage({
-        type: 'COMMIT_REQUEST',
-        exportData,
-        dryRun,
-        commitPrefix,
-      });
-    },
-    []
-  );
+  const startCommit = useCallback((exportData: ExportBundle, dryRun = false, commitPrefix = '') => {
+    setCommitState({ inProgress: true, success: false, skipped: false });
+    sendMessage({
+      type: 'COMMIT_REQUEST',
+      exportBundle: exportData,
+      dryRun,
+      commitPrefix,
+    });
+  }, []);
 
   const resetCommit = useCallback(() => {
     setCommitState({ inProgress: false, success: false, skipped: false });
   }, []);
 
-  const fetchRemoteData = useCallback(() => {
-    setRemoteDataState({ loading: true });
-    sendMessage({ type: 'FETCH_REMOTE_EXPORT' });
+  const fetchRemoteData = useCallback((paths: string[]) => {
+    if (!paths.length) {
+      setRemoteDataState({ loading: false, files: [], fetched: true });
+      return;
+    }
+    setRemoteDataState({ loading: true, files: [] });
+    sendMessage({ type: 'FETCH_REMOTE_EXPORT', files: paths });
   }, []);
 
   // Listen for messages from plugin
@@ -161,6 +168,7 @@ export const PluginProvider: FunctionComponent<PluginProviderProps> = ({ childre
       if (msg.type === 'EXPORT_RESULT') {
         if (msg.ok) {
           setExportState({ loading: false, data: msg.data });
+          setRemoteDataState({ loading: false, files: [], fetched: false });
         } else {
           setExportState({ loading: false, error: msg.error });
           notify('error', `Export failed: ${msg.error}`);
@@ -181,7 +189,7 @@ export const PluginProvider: FunctionComponent<PluginProviderProps> = ({ childre
             notify('success', 'Successfully committed to GitHub!');
             // Invalidate remote data cache after successful commit
             // This ensures the diff viewer will re-fetch and show correct state
-            setRemoteDataState({ loading: false, fetched: false });
+            setRemoteDataState({ loading: false, files: [], fetched: false });
           }
         } else {
           setCommitState({
@@ -196,10 +204,9 @@ export const PluginProvider: FunctionComponent<PluginProviderProps> = ({ childre
 
       if (msg.type === 'FETCH_REMOTE_EXPORT_RESULT') {
         if (msg.ok) {
-          setRemoteDataState({ loading: false, data: msg.data, fetched: true });
+          setRemoteDataState({ loading: false, files: msg.files, fetched: true });
         } else {
-          // Don't show notification for fetch errors - let the component handle display
-          setRemoteDataState({ loading: false, error: msg.error, fetched: true });
+          setRemoteDataState({ loading: false, files: [], error: msg.error, fetched: true });
         }
       }
     };

@@ -1,45 +1,24 @@
 /**
  * FigGit - Main Plugin Logic
  *
- * This file runs in the Figma plugin sandbox (restricted JavaScript environment).
- * It handles:
- * - Variable extraction from Figma files
- * - Communication with the UI via postMessage
- * - Settings persistence in Figma's plugin data storage
- * - Secure GitHub token storage in clientStorage
- * - GitHub API interactions for committing files
- *
- * Note: No access to browser APIs - uses pure JavaScript implementations
- * for SHA-256, Base64 encoding, and UTF-8 conversion.
+ * Runs inside the Figma plugin sandbox and coordinates:
+ * - Exporting variables in the selected format
+ * - Persisting settings and GitHub token state
+ * - Handling GitHub commits and remote diffs
  */
 
 /// <reference types="@figma/plugin-typings" />
-import { buildDtcgJson } from './export/buildDtcgJson';
-import {
-  SETTINGS_KEY,
-  defaultSettings,
-  UIToPluginMessage,
-  PluginToUIMessage,
-  PersistedSettings,
-} from './messaging';
-import { upsertFile, fromBase64 } from './github/githubClient';
+import { buildExportBundle } from './export/buildExportBundle';
+import { SETTINGS_KEY, defaultSettings, UIToPluginMessage, PersistedSettings } from './messaging';
+import { commitFiles, fromBase64 } from './github/githubClient';
 import { stableStringify } from './util/stableStringify';
+import { buildRepoPath } from './util/path';
 import { validateAllSettings } from './util/validation';
 
-// Show UI on plugin start
+type CommitRequestMessage = Extract<UIToPluginMessage, { type: 'COMMIT_REQUEST' }>;
+
 figma.showUI(__html__, { width: 600, height: 750, themeColors: true });
 
-/**
- * Retrieves plugin settings from Figma's persistent storage.
- *
- * Settings are stored in the root node's plugin data and include:
- * - GitHub repository configuration (owner, repo, branch)
- * - Output file settings (folder, filename)
- * - Commit customization (prefix)
- * - Last known content hash (for change detection)
- *
- * @returns Promise resolving to persisted settings or defaults if none exist
- */
 async function getStoredSettings(): Promise<PersistedSettings> {
   try {
     const raw = figma.root.getPluginData(SETTINGS_KEY);
@@ -50,42 +29,22 @@ async function getStoredSettings(): Promise<PersistedSettings> {
   }
 }
 
-/**
- * Saves plugin settings to Figma's persistent storage.
- *
- * These settings persist across plugin sessions and are specific to the current
- * Figma file (not shared across files or users).
- *
- * @param settings - Settings object to persist
- */
 async function saveSettings(settings: PersistedSettings) {
   figma.root.setPluginData(SETTINGS_KEY, JSON.stringify(settings));
 }
 
-/**
- * Checks if a GitHub Personal Access Token is stored.
- *
- * Tokens are stored in clientStorage (secure, local-only storage) and are:
- * - Never exported or sent to the UI after initial save
- * - Accessible only within the plugin sandbox
- * - Persistent across plugin sessions
- *
- * @returns Promise resolving to true if token exists, false otherwise
- */
 async function hasToken(): Promise<boolean> {
   return !!(await figma.clientStorage.getAsync('github_pat'));
 }
 
-/**
- * Validates the stored GitHub token by calling the GitHub API.
- *
- * Makes a test request to https://api.github.com/user to verify:
- * - Token is valid and not expired
- * - Token has necessary permissions
- * - Network connectivity to GitHub
- *
- * Sends result back to UI via TOKEN_VALIDATION message.
- */
+async function postSettingsResponse(seed?: PersistedSettings) {
+  const settings = seed ?? (await getStoredSettings());
+  figma.ui.postMessage({
+    type: 'SETTINGS_RESPONSE',
+    payload: { ...settings, tokenPresent: await hasToken() },
+  });
+}
+
 async function validateTokenAndNotify() {
   try {
     const token = await figma.clientStorage.getAsync('github_pat');
@@ -93,292 +52,293 @@ async function validateTokenAndNotify() {
       figma.ui.postMessage({ type: 'TOKEN_VALIDATION', ok: false, error: 'No token stored' });
       return;
     }
+
     const res = await fetch('https://api.github.com/user', {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
     });
+
     if (!res.ok) {
       figma.ui.postMessage({ type: 'TOKEN_VALIDATION', ok: false, error: `Status ${res.status}` });
       return;
     }
-    const json = (await res.json()) as { login: string };
+
+    const json = (await res.json()) as { login?: string };
     figma.ui.postMessage({ type: 'TOKEN_VALIDATION', ok: true, login: json.login });
-  } catch (e) {
-    const error = e instanceof Error ? e.message : 'Validation failed';
-    figma.ui.postMessage({ type: 'TOKEN_VALIDATION', ok: false, error });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    figma.ui.postMessage({ type: 'TOKEN_VALIDATION', ok: false, error: message });
   }
 }
 
-/**
- * Message handler for UI-to-Plugin communication.
- *
- * Handles all messages sent from the React UI via postMessage:
- *
- * REQUEST_EXPORT: Extract variables from current Figma file
- * FETCH_REMOTE_EXPORT: Fetch existing JSON from GitHub repository
- * REQUEST_SETTINGS: Send current settings to UI
- * SAVE_SETTINGS: Persist settings to plugin data
- * SAVE_TOKEN: Store GitHub token in clientStorage
- * CLEAR_TOKEN: Remove GitHub token from clientStorage
- * VALIDATE_TOKEN: Test GitHub token validity
- * COMMIT_REQUEST: Commit exported JSON to GitHub
- *
- * All responses are sent back to UI via postMessage with appropriate
- * message types defined in messaging.ts.
- */
-figma.ui.onmessage = async (msg: UIToPluginMessage) => {
-  // Extract variables from the current Figma file
-  if (msg.type === 'REQUEST_EXPORT') {
-    try {
-      const data = await buildDtcgJson(figma);
-      figma.ui.postMessage({ type: 'EXPORT_RESULT', ok: true, data } as PluginToUIMessage);
-    } catch (e) {
-      figma.ui.postMessage({
-        type: 'EXPORT_RESULT',
-        ok: false,
-        error: (e as Error).message,
-      } as PluginToUIMessage);
-    }
+async function handleExportRequest() {
+  try {
+    const settings = await getStoredSettings();
+    const bundle = await buildExportBundle(figma, settings);
+    figma.ui.postMessage({ type: 'EXPORT_RESULT', ok: true, data: bundle });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    figma.ui.postMessage({ type: 'EXPORT_RESULT', ok: false, error: message });
   }
+}
 
-  // Fetch existing exported JSON from GitHub for diff comparison
-  if (msg.type === 'FETCH_REMOTE_EXPORT') {
-    try {
-      const settings = await getStoredSettings();
-      const token = await figma.clientStorage.getAsync('github_pat');
-      if (!token) {
-        figma.ui.postMessage({
-          type: 'FETCH_REMOTE_EXPORT_RESULT',
-          ok: false,
-          error: 'Missing token',
-        });
-        return;
-      }
-      const path =
-        (settings.folder
-          ? settings.folder.replace(/\\+/g, '/').replace(/^\//, '').replace(/\/$/, '') + '/'
-          : '') + settings.filename;
-      const url = `https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${encodeURIComponent(path)}?ref=${settings.branch}`;
-      const res = await fetch(url, {
-        headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}` },
-      });
-      if (res.status === 404) {
-        figma.ui.postMessage({ type: 'FETCH_REMOTE_EXPORT_RESULT', ok: true, data: null });
-        return;
-      }
-      if (!res.ok) {
-        figma.ui.postMessage({
-          type: 'FETCH_REMOTE_EXPORT_RESULT',
-          ok: false,
-          error: `Status ${res.status}`,
-        });
-        return;
-      }
-      const json = await res.json();
-      try {
-        const decoded = fromBase64(json.content);
-        const parsed = JSON.parse(decoded);
-        figma.ui.postMessage({ type: 'FETCH_REMOTE_EXPORT_RESULT', ok: true, data: parsed });
-      } catch (e) {
-        const error = e instanceof Error ? e.message : 'Unknown';
-        figma.ui.postMessage({
-          type: 'FETCH_REMOTE_EXPORT_RESULT',
-          ok: false,
-          error: 'Parse error: ' + error,
-        });
-      }
-    } catch (e) {
-      const error = e instanceof Error ? e.message : 'Unknown error';
-      figma.ui.postMessage({ type: 'FETCH_REMOTE_EXPORT_RESULT', ok: false, error });
-    }
-  }
-
-  // Send current settings to UI (requested on plugin load and after changes)
-  if (msg.type === 'REQUEST_SETTINGS') {
-    const s = await getStoredSettings();
-    figma.ui.postMessage({
-      type: 'SETTINGS_RESPONSE',
-      payload: { ...s, tokenPresent: await hasToken() },
-    } as PluginToUIMessage);
-  }
-
-  // Save repository/export settings (not including token)
-  if (msg.type === 'SAVE_SETTINGS') {
-    await saveSettings(msg.payload);
-    figma.ui.postMessage({
-      type: 'NOTIFY',
-      level: 'info',
-      message: 'Settings saved',
-    } as PluginToUIMessage);
-  }
-
-  // Store GitHub Personal Access Token in secure clientStorage
-  if (msg.type === 'SAVE_TOKEN') {
-    try {
-      await figma.clientStorage.setAsync('github_pat', msg.token.trim());
-      figma.ui.postMessage({ type: 'NOTIFY', level: 'info', message: 'Token stored locally' });
-      figma.ui.postMessage({
-        type: 'SETTINGS_RESPONSE',
-        payload: { ...(await getStoredSettings()), tokenPresent: true },
-      });
-      // Auto validate after save
-      await validateTokenAndNotify();
-    } catch {
-      figma.ui.postMessage({ type: 'NOTIFY', level: 'error', message: 'Failed saving token' });
-    }
-  }
-
-  // Remove GitHub token from clientStorage
-  if (msg.type === 'CLEAR_TOKEN') {
-    await figma.clientStorage.deleteAsync('github_pat');
-    figma.ui.postMessage({ type: 'NOTIFY', level: 'info', message: 'Token cleared' });
-    figma.ui.postMessage({
-      type: 'SETTINGS_RESPONSE',
-      payload: { ...(await getStoredSettings()), tokenPresent: false },
-    });
-  }
-
-  // Test GitHub token validity
-  if (msg.type === 'VALIDATE_TOKEN') {
-    await validateTokenAndNotify();
-  }
-
-  // Copy text to clipboard (handled in UI, this is just for notification)
-  if (msg.type === 'COPY_TO_CLIPBOARD') {
-    // The UI handles the actual copying, we just acknowledge
-    // This message type exists for potential future enhancements
-  }
-
-  // Display notification in Figma UI
-  if (msg.type === 'NOTIFY') {
-    figma.notify(msg.message, { error: msg.level === 'error' });
-  }
-
-  // Commit exported variables JSON to GitHub
-  if (msg.type === 'COMMIT_REQUEST') {
-    try {
-      const exportData = msg.exportData;
-
-      // Handle dry run mode (test without actually committing)
-      if (msg.dryRun) {
-        figma.ui.postMessage({ type: 'COMMIT_RESULT', ok: true, skipped: true });
-        return;
-      }
-
-      const token = await figma.clientStorage.getAsync('github_pat');
-      if (!token) {
-        figma.ui.postMessage({ type: 'COMMIT_RESULT', ok: false, error: 'Missing token' });
-        return;
-      }
-      const settings = await getStoredSettings();
-
-      // Validate settings before proceeding
-      const validationResult = validateAllSettings({
-        owner: settings.owner,
-        repo: settings.repo,
-        branch: settings.branch,
-        filename: settings.filename,
-        folder: settings.folder,
-      });
-      if (!validationResult.valid) {
-        figma.ui.postMessage({
-          type: 'COMMIT_RESULT',
-          ok: false,
-          error: `Validation error: ${validationResult.error}`,
-        });
-        return;
-      }
-
-      // Extract metadata (supports both legacy and DTCG formats)
-      let newHash = '';
-      let vars = 0;
-      let cols = 0;
-
-      // Check if it's DTCG format (has $extensions) or legacy format (has meta)
-      if ('$extensions' in exportData) {
-        // DTCG format
-        const figmaExt = exportData.$extensions?.['com.figma'] as
-          | Record<string, unknown>
-          | undefined;
-        newHash = (figmaExt?.contentHash as string) || '';
-        vars = (figmaExt?.variablesCount as number) || 0;
-        cols = (figmaExt?.collectionsCount as number) || 0;
-      } else if ('meta' in exportData) {
-        // Legacy format
-        const meta = exportData.meta as Record<string, unknown>;
-        newHash = (meta.contentHash as string) || '';
-        vars = (meta.variablesCount as number) || 0;
-        cols = (meta.collectionsCount as number) || 0;
-      }
-
-      // Hash comparison happens only here in the plugin (single source of truth)
-      // This prevents redundant commits when content hasn't actually changed
-      if (settings.lastHash && settings.lastHash === newHash) {
-        figma.ui.postMessage({ type: 'COMMIT_RESULT', ok: true, skipped: true });
-        return;
-      }
-
-      // Build commit message with variable/collection counts and timestamp
-      const ts = new Date().toISOString();
-      const prefix =
-        msg.commitPrefix || settings.commitPrefix
-          ? `${msg.commitPrefix || settings.commitPrefix} `
-          : '';
-      const commitMessage = `${prefix}update Figma variables (${vars} vars, ${cols} collections) - ${ts}`;
-      const path =
-        (settings.folder
-          ? settings.folder.replace(/\\+/g, '/').replace(/^\//, '').replace(/\/$/, '') + '/'
-          : '') + settings.filename;
-      const json = stableStringify(exportData, 2);
-
-      // Attempt to commit to GitHub (with automatic retry on 409 conflicts)
-      const result = await upsertFile({
-        owner: settings.owner,
-        repo: settings.repo,
-        branch: settings.branch,
-        path,
-        content: json,
-        token,
-        commitMessage,
-        currentHash: newHash as string,
-      });
-
-      // Update stored hash only if commit succeeded and wasn't skipped
-      if (!result.skipped && newHash) {
-        await saveSettings({ ...settings, lastHash: newHash });
-      }
-
+async function handleCommitRequest(msg: CommitRequestMessage) {
+  try {
+    const exportBundle = msg.exportBundle;
+    if (!exportBundle || !exportBundle.documents.length) {
       figma.ui.postMessage({
         type: 'COMMIT_RESULT',
-        ok: true,
-        skipped: result.skipped,
-        url: result.url,
+        ok: false,
+        error: 'No export data to commit',
       });
-    } catch (e) {
-      const error = e instanceof Error ? e : new Error(String(e));
-      console.error('Commit error:', error);
-      let msgText = error.message || 'Unknown error';
-      // Add stack trace for debugging if available
-      if (error.stack) {
-        console.error('Stack:', error.stack);
-      }
-      // Provide user-friendly error messages for common HTTP status codes
-      if (/401/.test(msgText)) msgText = 'Unauthorized (check token)';
-      else if (/403/.test(msgText)) msgText = 'Forbidden (check permissions)';
-      else if (/404/.test(msgText)) msgText = 'Not found (check repository)';
-      else if (/422/.test(msgText)) msgText = 'Validation failed (check branch/file path)';
-      figma.ui.postMessage({ type: 'COMMIT_RESULT', ok: false, error: msgText });
+      return;
     }
+
+    if (msg.dryRun) {
+      figma.ui.postMessage({ type: 'COMMIT_RESULT', ok: true, skipped: true });
+      return;
+    }
+
+    const token = await figma.clientStorage.getAsync('github_pat');
+    if (!token) {
+      figma.ui.postMessage({ type: 'COMMIT_RESULT', ok: false, error: 'Missing token' });
+      return;
+    }
+
+    const settings = await getStoredSettings();
+    const validationResult = validateAllSettings({
+      owner: settings.owner,
+      repo: settings.repo,
+      branch: settings.branch,
+      filename: settings.filename,
+      folder: settings.folder,
+    });
+    if (!validationResult.valid) {
+      figma.ui.postMessage({
+        type: 'COMMIT_RESULT',
+        ok: false,
+        error: `Validation error: ${validationResult.error}`,
+      });
+      return;
+    }
+
+    const storedHashes = getLastHashMap(settings);
+    const pendingDocs = exportBundle.documents.filter(
+      (doc) => storedHashes[doc.relativePath] !== doc.contentHash
+    );
+
+    if (!pendingDocs.length) {
+      figma.ui.postMessage({ type: 'COMMIT_RESULT', ok: true, skipped: true });
+      return;
+    }
+
+    const overridePrefix = msg.commitPrefix?.trim();
+    const defaultPrefix = settings.commitPrefix?.trim();
+    const prefixValue = overridePrefix || defaultPrefix || '';
+    const prefix = prefixValue ? `${prefixValue} ` : '';
+    const timestamp = new Date().toISOString();
+    const vars = exportBundle.summary.variablesCount;
+    const cols = exportBundle.summary.collectionsCount;
+    const commitMessage = `${prefix}update Figma variables (${vars} vars, ${cols} collections) - ${timestamp}`;
+
+    const files = pendingDocs.map((doc) => ({
+      path: doc.relativePath,
+      content: stableStringify(doc.data, 2),
+      contentHash: doc.contentHash,
+    }));
+
+    const result = await commitFiles({
+      owner: settings.owner,
+      repo: settings.repo,
+      branch: settings.branch,
+      token,
+      commitMessage,
+      files,
+    });
+
+    const nextHashes = { ...storedHashes };
+    for (const doc of exportBundle.documents) {
+      nextHashes[doc.relativePath] = doc.contentHash;
+    }
+
+    await saveSettings({
+      ...settings,
+      lastHashes: nextHashes,
+      lastHash: exportBundle.summary.contentHash,
+    });
+
+    figma.ui.postMessage({
+      type: 'COMMIT_RESULT',
+      ok: true,
+      skipped: result.skipped,
+      url: result.url,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    figma.ui.postMessage({ type: 'COMMIT_RESULT', ok: false, error: formatGitHubError(message) });
+  }
+}
+
+async function handleFetchRemoteExport(paths: string[]) {
+  if (!paths.length) {
+    figma.ui.postMessage({ type: 'FETCH_REMOTE_EXPORT_RESULT', ok: true, files: [] });
+    return;
+  }
+
+  try {
+    const settings = await getStoredSettings();
+    if (!settings.owner || !settings.repo || !settings.branch) {
+      throw new Error('Configure repository settings to fetch remote files');
+    }
+
+    const token = await figma.clientStorage.getAsync('github_pat');
+    if (!token) {
+      throw new Error('Missing token');
+    }
+
+    const normalizedPaths = Array.from(
+      new Set(paths.map((path) => normalizeRepoPath(path)).filter((path) => path.length))
+    );
+
+    const results: Array<{ path: string; data?: unknown | null; error?: string }> = [];
+
+    for (const path of normalizedPaths) {
+      try {
+        const encodedPath = encodeContentPath(path);
+        const url = `https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${encodedPath}?ref=${settings.branch}`;
+        const res = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/vnd.github+json',
+          },
+        });
+
+        if (res.status === 404) {
+          results.push({ path, data: null });
+          continue;
+        }
+
+        if (!res.ok) {
+          results.push({ path, error: `Status ${res.status}` });
+          continue;
+        }
+
+        const json = await res.json();
+        if (typeof json.content !== 'string') {
+          results.push({ path, error: 'Missing content' });
+          continue;
+        }
+
+        try {
+          const decoded = fromBase64(json.content);
+          const parsed = JSON.parse(decoded);
+          results.push({ path, data: parsed });
+        } catch (parseError) {
+          const error = parseError instanceof Error ? parseError.message : 'Unknown error';
+          results.push({ path, error: 'Parse error: ' + error });
+        }
+      } catch (innerError) {
+        const message = innerError instanceof Error ? innerError.message : 'Unknown error';
+        results.push({ path, error: message });
+      }
+    }
+
+    figma.ui.postMessage({ type: 'FETCH_REMOTE_EXPORT_RESULT', ok: true, files: results });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    figma.ui.postMessage({ type: 'FETCH_REMOTE_EXPORT_RESULT', ok: false, error: message });
+  }
+}
+
+function normalizeRepoPath(path: string): string {
+  return path.trim().replace(/\\+/g, '/').replace(/^\/+/g, '');
+}
+
+function encodeContentPath(path: string): string {
+  return path
+    .split('/')
+    .filter((segment) => segment.length)
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+}
+
+function formatGitHubError(message: string): string {
+  if (/401/.test(message)) return 'Unauthorized (check token)';
+  if (/403/.test(message)) return 'Forbidden (check permissions)';
+  if (/404/.test(message)) return 'Not found (check repository)';
+  if (/409/.test(message)) return 'Conflict (branch updated)';
+  if (/422/.test(message)) return 'Validation failed (check branch/path)';
+  return message;
+}
+
+function getLastHashMap(settings: PersistedSettings): Record<string, string> {
+  const map = { ...(settings.lastHashes || {}) };
+  if (!Object.keys(map).length && settings.lastHash) {
+    const legacyPath = buildRepoPath(settings.folder, settings.filename);
+    map[legacyPath] = settings.lastHash;
+  }
+  return map;
+}
+
+figma.ui.onmessage = async (msg: UIToPluginMessage) => {
+  switch (msg.type) {
+    case 'REQUEST_EXPORT':
+      await handleExportRequest();
+      break;
+    case 'REQUEST_SETTINGS':
+      await postSettingsResponse();
+      break;
+    case 'SAVE_SETTINGS': {
+      const merged = { ...defaultSettings(), ...msg.payload };
+      await saveSettings(merged);
+      await postSettingsResponse(merged);
+      break;
+    }
+    case 'SAVE_TOKEN':
+      try {
+        const trimmed = msg.token.trim();
+        if (!trimmed) {
+          figma.ui.postMessage({
+            type: 'NOTIFY',
+            level: 'error',
+            message: 'Token cannot be empty',
+          });
+          return;
+        }
+        await figma.clientStorage.setAsync('github_pat', trimmed);
+        figma.ui.postMessage({ type: 'NOTIFY', level: 'info', message: 'Token stored locally' });
+        await postSettingsResponse();
+        await validateTokenAndNotify();
+      } catch {
+        figma.ui.postMessage({ type: 'NOTIFY', level: 'error', message: 'Failed saving token' });
+      }
+      break;
+    case 'CLEAR_TOKEN':
+      await figma.clientStorage.deleteAsync('github_pat');
+      figma.ui.postMessage({ type: 'NOTIFY', level: 'info', message: 'Token cleared' });
+      await postSettingsResponse();
+      break;
+    case 'VALIDATE_TOKEN':
+      await validateTokenAndNotify();
+      break;
+    case 'COMMIT_REQUEST':
+      await handleCommitRequest(msg);
+      break;
+    case 'FETCH_REMOTE_EXPORT':
+      await handleFetchRemoteExport(msg.files);
+      break;
+    case 'COPY_TO_CLIPBOARD':
+      break;
+    case 'NOTIFY':
+      figma.notify(msg.message, { error: msg.level === 'error' });
+      break;
+    case 'PING':
+      figma.ui.postMessage({ type: 'NOTIFY', level: 'info', message: 'Plugin ready' });
+      break;
   }
 };
 
-/**
- * Optional run handler for future command integration.
- *
- * This allows the plugin to be manually triggered via Figma's command palette
- * or other plugin entry points.
- */
-figma.on('run', () => {
+figma.on('run', async () => {
   figma.ui.show();
   figma.ui.resize(600, 750);
-  figma.ui.postMessage({ type: 'REQUEST_SETTINGS' });
+  await postSettingsResponse();
 });

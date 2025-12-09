@@ -14,7 +14,6 @@
  */
 
 import type { DtcgRoot, DtcgToken, DtcgTokenValue } from '../shared/dtcg-types';
-import type { VariableModeValue } from '../shared/types';
 import {
   buildTokenPath,
   convertValue,
@@ -24,6 +23,7 @@ import {
 } from '../util/dtcgUtils';
 import { stableStringify } from '../util/stableStringify';
 import { sha256 } from './hash';
+import { normalizeModeValue } from './valueNormalization';
 
 /** Plugin version - can be replaced during build via define if desired */
 const PLUGIN_VERSION = '0.2.0';
@@ -206,66 +206,5 @@ export async function buildDtcgJson(figmaApi: PluginAPI): Promise<DtcgRoot> {
     throw new Error(
       `Failed to build DTCG JSON: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
-  }
-}
-
-/**
- * Normalizes a variable's mode value into our structured format.
- *
- * Figma's variable values can be:
- * - Colors (objects with r, g, b, a properties)
- * - Aliases (references to other variables)
- * - Primitives (strings, numbers, booleans)
- *
- * @param raw - Raw value from Figma's variable API
- * @returns Normalized value with explicit type
- */
-function normalizeModeValue(raw: unknown): VariableModeValue {
-  if (!raw || typeof raw !== 'object') {
-    // Primitives (string/number/boolean) or unexpected values
-    return inferPrimitive(raw);
-  }
-
-  const obj = raw as Record<string, unknown>;
-
-  // Alias detection: Figma 2025 API uses { type: 'VARIABLE_ALIAS', id: '...' }
-  if (obj.type === 'VARIABLE_ALIAS' && typeof obj.id === 'string') {
-    return { type: 'ALIAS', refVariableId: obj.id };
-  }
-
-  // Color detection: Figma colors have r, g, b properties (0-1 range)
-  if (typeof obj.r === 'number' && typeof obj.g === 'number' && typeof obj.b === 'number') {
-    return {
-      type: 'COLOR',
-      value: {
-        r: obj.r,
-        g: obj.g,
-        b: obj.b,
-        a: typeof obj.a === 'number' ? obj.a : 1,
-      },
-    };
-  }
-
-  // Fallback to primitive inference
-  return inferPrimitive(raw);
-}
-
-/**
- * Infers the type of a primitive value and wraps it in our value format.
- *
- * @param val - Primitive value
- * @returns Typed value object
- */
-function inferPrimitive(val: unknown): VariableModeValue {
-  switch (typeof val) {
-    case 'string':
-      return { type: 'STRING', value: val };
-    case 'number':
-      return { type: 'NUMBER', value: val };
-    case 'boolean':
-      return { type: 'BOOLEAN', value: val };
-    default:
-      // Fallback: convert to string
-      return { type: 'STRING', value: String(val) };
   }
 }

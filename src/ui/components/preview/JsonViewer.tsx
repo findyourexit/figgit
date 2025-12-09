@@ -6,16 +6,7 @@
 
 import { h, FunctionComponent } from 'preact';
 import { useCallback } from 'preact/hooks';
-import {
-  Stack,
-  Text,
-  Muted,
-  Bold,
-  Button,
-  Banner,
-  VerticalSpace,
-  IconInfoSmall24,
-} from '@create-figma-plugin/ui';
+import { Stack, Text, Muted, Bold, Button, Banner, IconInfoSmall24 } from '@create-figma-plugin/ui';
 import { usePlugin } from '../../context/PluginContext';
 import { stableStringify } from '../../../util/stableStringify';
 import styles from './JsonViewer.module.css';
@@ -23,56 +14,46 @@ import styles from './JsonViewer.module.css';
 export const JsonViewer: FunctionComponent = () => {
   const { exportState, sendMessage } = usePlugin();
 
-  const handleCopyJson = useCallback(() => {
-    if (!exportState.data) return;
+  const handleCopyJson = useCallback(
+    (text: string, fileLabel: string) => {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      textarea.style.pointerEvents = 'none';
+      document.body.appendChild(textarea);
 
-    const text = stableStringify(exportState.data, 2);
+      try {
+        textarea.select();
+        textarea.setSelectionRange(0, text.length);
 
-    // Create a temporary textarea element for reliable clipboard copying
-    // This is the recommended approach for iframe environments like Figma plugins
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed'; // Prevent scrolling to bottom
-    textarea.style.opacity = '0';
-    textarea.style.pointerEvents = 'none';
-    document.body.appendChild(textarea);
-
-    try {
-      // Select the text
-      textarea.select();
-      textarea.setSelectionRange(0, text.length);
-
-      // Execute copy command
-      const successful = document.execCommand('copy');
-
-      if (successful) {
-        // Send success notification to Figma (green toast)
-        sendMessage({
-          type: 'NOTIFY',
-          level: 'info',
-          message: 'JSON copied to clipboard',
-        });
-      } else {
-        // Fallback: notify user to manually copy
+        const successful = document.execCommand('copy');
+        if (successful) {
+          sendMessage({
+            type: 'NOTIFY',
+            level: 'info',
+            message: `${fileLabel} copied to clipboard`,
+          });
+        } else {
+          sendMessage({
+            type: 'NOTIFY',
+            level: 'error',
+            message: 'Copy failed - please select and copy manually',
+          });
+        }
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Unknown error';
         sendMessage({
           type: 'NOTIFY',
           level: 'error',
-          message: 'Copy failed - please select and copy manually',
+          message: `Copy failed: ${errorMsg}`,
         });
+      } finally {
+        document.body.removeChild(textarea);
       }
-    } catch (err) {
-      // Error case: show red toast with error message
-      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-      sendMessage({
-        type: 'NOTIFY',
-        level: 'error',
-        message: `Copy failed: ${errorMsg}`,
-      });
-    } finally {
-      // Clean up the temporary textarea
-      document.body.removeChild(textarea);
-    }
-  }, [exportState.data, sendMessage]);
+    },
+    [sendMessage]
+  );
 
   if (!exportState.data) {
     return (
@@ -81,51 +62,55 @@ export const JsonViewer: FunctionComponent = () => {
       </Banner>
     );
   }
-
-  const jsonText = stableStringify(exportState.data, 2);
-
-  // Extract metadata based on format
-  let variablesCount = 0;
-  let collectionsCount = 0;
-
-  if ('meta' in exportState.data) {
-    // Legacy format
-    const meta = exportState.data.meta as { variablesCount?: number; collectionsCount?: number };
-    variablesCount = meta.variablesCount || 0;
-    collectionsCount = meta.collectionsCount || 0;
-  } else if ('$extensions' in exportState.data) {
-    // DTCG format
-    const figmaExt = exportState.data.$extensions?.['com.figma'] as
-      | Record<string, unknown>
-      | undefined;
-    variablesCount = (figmaExt?.variablesCount as number) || 0;
-    collectionsCount = (figmaExt?.collectionsCount as number) || 0;
-  }
+  const bundle = exportState.data;
+  const summary = bundle.summary;
+  const documents = bundle.documents;
+  const variablesCount = summary.variablesCount;
+  const collectionsCount = summary.collectionsCount;
+  const formatLabel = summary.format === 'figma-native' ? 'Figma-native' : 'DTCG';
+  const exportTypeLabel = summary.exportType === 'perCollection' ? 'Per collection' : 'Single file';
 
   return (
-    <Stack space="small">
-      <Text>
-        <Bold>Export Data</Bold>
-      </Text>
-      <Text>
-        <Muted>
-          {variablesCount} variables • {collectionsCount} collections
-        </Muted>
-      </Text>
+    <Stack space="large">
+      <Stack space="extraSmall">
+        <Text>
+          <Bold>Export Summary</Bold>
+        </Text>
+        <Text>
+          <Muted>
+            {variablesCount} variables • {collectionsCount} collections
+          </Muted>
+        </Text>
+        <Text>
+          <Muted>
+            {formatLabel} · {exportTypeLabel}
+          </Muted>
+        </Text>
+      </Stack>
 
-      <VerticalSpace space="small" />
-
-      <div className={`${styles.jsonPreview} jsonPreview`}>
-        <pre>
-          <code>{jsonText}</code>
-        </pre>
-      </div>
-
-      <VerticalSpace space="small" />
-
-      <Button onClick={handleCopyJson} secondary fullWidth>
-        Copy to Clipboard
-      </Button>
+      {documents.map((doc) => {
+        const jsonText = stableStringify(doc.data, 2);
+        return (
+          <Stack key={doc.id} space="small">
+            <Stack space="extraSmall">
+              <Text>
+                <Bold>{doc.label}</Bold>
+              </Text>
+              <Text>
+                <Muted>{doc.relativePath}</Muted>
+              </Text>
+            </Stack>
+            <div className={`${styles.jsonPreview} jsonPreview`}>
+              <pre>
+                <code>{jsonText}</code>
+              </pre>
+            </div>
+            <Button onClick={() => handleCopyJson(jsonText, doc.fileName)} secondary fullWidth>
+              Copy {doc.fileName}
+            </Button>
+          </Stack>
+        );
+      })}
     </Stack>
   );
 };
