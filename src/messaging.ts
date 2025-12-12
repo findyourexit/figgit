@@ -86,6 +86,8 @@ export interface PersistedSettings {
   repo: string;
   /** Target branch name (e.g., 'main', 'develop') */
   branch: string;
+  /** Repository default branch used for diff fallback/branch creation */
+  defaultBranch?: string;
   /** Optional folder path within repository (e.g., 'design-tokens') */
   folder: string;
   /** Filename for exported JSON (e.g., 'variables.json') */
@@ -120,6 +122,7 @@ export function defaultSettings(): PersistedSettings {
     owner: '',
     repo: '',
     branch: 'main',
+    defaultBranch: '',
     folder: '',
     filename: 'variables.json',
     commitPrefix: '',

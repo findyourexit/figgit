@@ -1,6 +1,6 @@
 {
   "name": "figgit",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "A Figma plugin for exporting variables to GitHub.",
   "author": "Tom Larcher <tom.larcher@gmail.com>",
   "license": "MIT",
@@ -34,7 +34,7 @@
     "build:manifest": "cp manifest.json dist/manifest.json",
     "build:assets": "mkdir -p dist/assets && cp assets/logo.png dist/assets/logo.png",
     "package": "npm run build && npm run package:zip",
-    "package:zip": "PLUGIN_VERSION=$(node -p \"require('./package.json').version\") && cd dist && zip -r ../figgit-$PLUGIN_VERSION.zip . && cd ..",
+    "package:zip": "PLUGIN_VERSION=$(node -p \"require('./package.json').version\") && rm -f figgit-$PLUGIN_VERSION.zip && zip -r figgit-$PLUGIN_VERSION.zip manifest.json dist -x \"*/.DS_Store\" \"dist/manifest.json\"",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",

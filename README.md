@@ -25,6 +25,7 @@ A Figma plugin that extracts design variables (colors, typography, spacing, etc.
 - **One-Click Export**: Extract all Figma variables with full metadata
 - **Tab-Based Interface**: Organized UI with Export, Preview, and Settings tabs
 - **Direct GitHub Integration**: Commit directly to any branch (creates branch if needed)
+- **Flexible Branch Diffing**: Compare the export against the target branch first, then fall back to a configurable default branch to skip redundant commits
 - **Smart Change Detection**: SHA-256 content hashing prevents redundant commits
 - **Diff Preview**: See token-level changes before committing (added/modified/removed)
 - **JSON Preview**: View and copy any exported JSON document (DTCG or Figma-native) directly in the plugin
@@ -277,7 +278,8 @@ Configure your GitHub repository and authentication:
 
 - Enter GitHub owner (username or organization)
 - Enter repository name
-- Specify target branch (will be created if it doesn't exist)
+- Specify the target branch for token exports (will be created if it doesn't exist)
+- (Optional) Provide the repository's default branch used for diff fallback and branch creation
 - (Optional) Specify folder path within the repo
 - Set output filename (must end with `.json`)
 
@@ -341,12 +343,12 @@ update Figma variables (42 vars, 3 collections) - 2025-01-15T10:30:00.123Z
 
 ### Smart Change Detection
 
-The plugin uses SHA-256 content hashing to detect changes:
+The plugin uses SHA-256 content hashing plus targeted branch diffing to detect changes:
 
-1. **Local Cache**: Stores hash of last export to skip unnecessary network calls
-2. **Remote Comparison**: Compares with `$extensions.com.figma.contentHash` in remote file
-3. **Fallback**: If remote file lacks hash (manual edits), recomputes hash for comparison
-4. **Skip Logic**: Only commits if content actually changed
+1. **Target Branch First**: Compares the export against the current target branch using the embedded `contentHash` field in each JSON payload
+2. **Default Branch Fallback**: If the target branch does not exist yet, FigGit checks the user-configured default branch (or the target branch when unset) before creating any commits
+3. **Hash Validation**: If remote files lack a `contentHash`, the plugin treats them as stale so the new export overwrites them with deterministic metadata
+4. **Skip Logic**: When no differences are detected on the inspected branch, the commit is skipped automatically
 
 ### Dry Run Mode
 
@@ -361,8 +363,8 @@ Enable dry run to:
 
 If the specified branch doesn't exist, the plugin:
 
-1. Fetches the repository's default branch
-2. Creates the new branch from the default branch HEAD
+1. Fetches the configured default branch (or the repository's default if none is specified)
+2. Creates the new branch from that base branch's HEAD
 3. Commits the variables file to the new branch
 
 ### Conflict Resolution

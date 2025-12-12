@@ -10,7 +10,7 @@
 /// <reference types="@figma/plugin-typings" />
 import { buildExportBundle } from './export/buildExportBundle';
 import { SETTINGS_KEY, defaultSettings, UIToPluginMessage, PersistedSettings } from './messaging';
-import { commitFiles, fromBase64 } from './github/githubClient';
+import { commitFiles, fromBase64, branchExists, getRemoteFileHashes } from './github/githubClient';
 import { stableStringify } from './util/stableStringify';
 import { buildRepoPath } from './util/path';
 import { validateAllSettings } from './util/validation';
@@ -111,6 +111,7 @@ async function handleCommitRequest(msg: CommitRequestMessage) {
       branch: settings.branch,
       filename: settings.filename,
       folder: settings.folder,
+      defaultBranch: settings.defaultBranch,
     });
     if (!validationResult.valid) {
       figma.ui.postMessage({
@@ -122,11 +123,44 @@ async function handleCommitRequest(msg: CommitRequestMessage) {
     }
 
     const storedHashes = getLastHashMap(settings);
-    const pendingDocs = exportBundle.documents.filter(
-      (doc) => storedHashes[doc.relativePath] !== doc.contentHash
-    );
 
-    if (!pendingDocs.length) {
+    const owner = settings.owner.trim();
+    const repo = settings.repo.trim();
+    const targetBranch = settings.branch.trim();
+    const fallbackBranch = settings.defaultBranch?.trim() || targetBranch;
+    const docPaths = Array.from(new Set(exportBundle.documents.map((doc) => doc.relativePath)));
+
+    const targetExists = await branchExists(owner, repo, targetBranch, token);
+
+    let diffBranch: string | null = targetBranch;
+    if (!targetExists) {
+      if (fallbackBranch && fallbackBranch !== targetBranch) {
+        const fallbackExists = await branchExists(owner, repo, fallbackBranch, token);
+        if (!fallbackExists) {
+          throw new Error(`Default branch "${fallbackBranch}" not found in ${owner}/${repo}`);
+        }
+        diffBranch = fallbackBranch;
+      } else {
+        diffBranch = null;
+      }
+    }
+
+    let remoteHashes: Record<string, string | null> = {};
+    if (diffBranch && docPaths.length) {
+      remoteHashes = await getRemoteFileHashes({
+        owner,
+        repo,
+        branch: diffBranch,
+        token,
+        paths: docPaths,
+      });
+    }
+
+    const pendingDocs = diffBranch
+      ? exportBundle.documents.filter((doc) => remoteHashes[doc.relativePath] !== doc.contentHash)
+      : exportBundle.documents;
+
+    if (diffBranch && !pendingDocs.length) {
       figma.ui.postMessage({ type: 'COMMIT_RESULT', ok: true, skipped: true });
       return;
     }
@@ -147,12 +181,13 @@ async function handleCommitRequest(msg: CommitRequestMessage) {
     }));
 
     const result = await commitFiles({
-      owner: settings.owner,
-      repo: settings.repo,
-      branch: settings.branch,
+      owner,
+      repo,
+      branch: targetBranch,
       token,
       commitMessage,
       files,
+      baseBranch: fallbackBranch,
     });
 
     const nextHashes = { ...storedHashes };
