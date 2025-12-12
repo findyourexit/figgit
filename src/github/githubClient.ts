@@ -59,6 +59,7 @@ export interface CommitFilesOptions {
   token: string;
   commitMessage: string;
   files: FileCommitPayload[];
+  baseBranch?: string;
 }
 
 export interface CommitFilesResult {
@@ -89,6 +90,8 @@ export interface GitHubUpsertOptions {
   commitMessage: string;
   /** SHA-256 content hash for change detection (not Git blob hash) */
   currentHash: string;
+  /** Optional base branch to create target branch from when missing */
+  baseBranch?: string;
 }
 
 /**
@@ -130,42 +133,69 @@ async function ghFetch(url: string, token: string, init: RequestInit = {}) {
   );
 }
 
-/**
- * Ensures a branch exists in the repository.
- *
- * If the branch doesn't exist, creates it from the default branch.
- * If it already exists, does nothing.
- *
- * @param owner - GitHub username or organization
- * @param repo - Repository name
- * @param branch - Branch name to ensure exists
- * @param token - GitHub PAT
- * @throws Error if unable to read repository or create branch
- */
-async function ensureBranch(owner: string, repo: string, branch: string, token: string) {
+export async function branchExists(
+  owner: string,
+  repo: string,
+  branch: string,
+  token: string
+): Promise<boolean> {
   const refUrl = `https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${branch}`;
   const ref = await ghFetch(refUrl, token);
 
-  if (ref.status === 200) return; // Branch exists
-  if (ref.status !== 404) throw new Error(`Failed reading branch: ${ref.status}`);
+  if (ref.status === 200) {
+    return true;
+  }
 
-  // Branch doesn't exist - create it from default branch
-  const repoRes = await ghFetch(`https://api.github.com/repos/${owner}/${repo}`, token);
-  if (!repoRes.ok) throw new Error('Cannot read repository metadata');
+  if (ref.status === 404) {
+    return false;
+  }
 
-  const repoJson = await repoRes.json();
-  const defaultBranch = repoJson.default_branch;
+  throw new Error(`Failed reading branch: ${ref.status}`);
+}
+
+/**
+ * Ensures a branch exists in the repository.
+ *
+ * If the branch doesn't exist, creates it from a base branch:
+ * - User-provided base branch (preferred)
+ * - Repository default branch (fallback)
+ *
+ * @throws Error if unable to read repository or create branch
+ */
+async function ensureBranch(
+  owner: string,
+  repo: string,
+  branch: string,
+  token: string,
+  baseBranch?: string
+) {
+  const exists = await branchExists(owner, repo, branch, token);
+  if (exists) return;
+
+  let sourceBranch = baseBranch?.trim();
+
+  if (!sourceBranch) {
+    const repoRes = await ghFetch(`https://api.github.com/repos/${owner}/${repo}`, token);
+    if (!repoRes.ok) throw new Error('Cannot read repository metadata');
+
+    const repoJson = await repoRes.json();
+    sourceBranch = repoJson.default_branch;
+  }
 
   const baseRefRes = await ghFetch(
-    `https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${defaultBranch}`,
+    `https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${sourceBranch}`,
     token
   );
-  if (!baseRefRes.ok) throw new Error('Cannot read default branch ref');
+  if (!baseRefRes.ok) {
+    if (baseBranch) {
+      throw new Error(`Cannot read base branch ref (${sourceBranch})`);
+    }
+    throw new Error('Cannot read default branch ref');
+  }
 
   const baseRef = await baseRefRes.json();
   const sha = baseRef.object.sha;
 
-  // Create new branch pointing to default branch's HEAD
   const createRes = await ghFetch(`https://api.github.com/repos/${owner}/${repo}/git/refs`, token, {
     method: 'POST',
     body: JSON.stringify({ ref: `refs/heads/${branch}`, sha }),
@@ -404,10 +434,11 @@ function extractEmbeddedHashFromJsonContent(content: string): string | undefined
  * @throws Error if unable to create/update file
  */
 export async function upsertFile(options: GitHubUpsertOptions): Promise<UpsertResult> {
-  const { owner, repo, branch, path, content, token, commitMessage, currentHash } = options;
+  const { owner, repo, branch, path, content, token, commitMessage, currentHash, baseBranch } =
+    options;
 
   // Ensure target branch exists (create from default branch if needed)
-  await ensureBranch(owner, repo, branch, token);
+  await ensureBranch(owner, repo, branch, token, baseBranch);
 
   // Check if file already exists
   const existing = await getExistingFile(owner, repo, branch, path, token);
@@ -502,13 +533,13 @@ export async function upsertFile(options: GitHubUpsertOptions): Promise<UpsertRe
 }
 
 export async function commitFiles(options: CommitFilesOptions): Promise<CommitFilesResult> {
-  const { owner, repo, branch, token, commitMessage, files } = options;
+  const { owner, repo, branch, token, commitMessage, files, baseBranch } = options;
 
   if (!files.length) {
     return { updated: false, skipped: true, updatedPaths: [] };
   }
 
-  await ensureBranch(owner, repo, branch, token);
+  await ensureBranch(owner, repo, branch, token, baseBranch);
 
   const filesToUpdate = await filterFilesNeedingUpdate(owner, repo, branch, token, files);
 
@@ -535,6 +566,45 @@ export async function commitFiles(options: CommitFilesOptions): Promise<CommitFi
     url: `https://github.com/${owner}/${repo}/commit/${commit.sha}`,
     commitSha: commit.sha,
   };
+}
+
+export interface RemoteHashLookupOptions {
+  owner: string;
+  repo: string;
+  branch: string;
+  token: string;
+  paths: string[];
+}
+
+/**
+ * Fetches embedded content hashes for a set of files from a specific branch.
+ *
+ * @returns Map of repo-relative path → content hash (null if file missing or hash absent)
+ */
+export async function getRemoteFileHashes(
+  options: RemoteHashLookupOptions
+): Promise<Record<string, string | null>> {
+  const { owner, repo, branch, token, paths } = options;
+  const uniquePaths = Array.from(new Set(paths));
+  const result: Record<string, string | null> = {};
+
+  for (const path of uniquePaths) {
+    const existing = await getExistingFile(owner, repo, branch, path, token);
+    if (!existing) {
+      result[path] = null;
+      continue;
+    }
+
+    try {
+      const decoded = fromBase64(existing.content);
+      const embeddedHash = extractEmbeddedHashFromJsonContent(decoded);
+      result[path] = embeddedHash ?? null;
+    } catch {
+      result[path] = null;
+    }
+  }
+
+  return result;
 }
 
 async function filterFilesNeedingUpdate(

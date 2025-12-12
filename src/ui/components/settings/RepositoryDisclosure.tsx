@@ -56,9 +56,17 @@ export const RepositoryDisclosure: FunctionComponent = () => {
         <Textbox
           value={settings.branch}
           onInput={(e) => updateSettings({ branch: e.currentTarget.value })}
+          placeholder="design-tokens"
+        >
+          <Text>Target Branch</Text>
+        </Textbox>
+
+        <Textbox
+          value={settings.defaultBranch || ''}
+          onInput={(e) => updateSettings({ defaultBranch: e.currentTarget.value })}
           placeholder="main"
         >
-          <Text>Branch</Text>
+          <Text>Default Branch (Optional)</Text>
         </Textbox>
 
         <Textbox

@@ -103,11 +103,20 @@ export const StatusSummary: FunctionComponent = () => {
         </Inline>
 
         <Inline space="small">
-          <Text>Branch:</Text>
+          <Text>Target Branch:</Text>
           <Text>
             <Muted>{settings.branch}</Muted>
           </Text>
         </Inline>
+
+        {settings.defaultBranch && settings.defaultBranch !== settings.branch ? (
+          <Inline space="small">
+            <Text>Default Branch:</Text>
+            <Text>
+              <Muted>{settings.defaultBranch}</Muted>
+            </Text>
+          </Inline>
+        ) : null}
       </Stack>
     </Stack>
   );

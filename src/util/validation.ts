@@ -196,6 +196,7 @@ export function validateAllSettings(settings: {
   branch: string;
   filename: string;
   folder?: string;
+  defaultBranch?: string;
 }): ValidationResult {
   const ownerResult = validateGitHubOwner(settings.owner);
   if (!ownerResult.valid) return ownerResult;
@@ -212,6 +213,11 @@ export function validateAllSettings(settings: {
   if (settings.folder) {
     const folderResult = validateFolderPath(settings.folder);
     if (!folderResult.valid) return folderResult;
+  }
+
+  if (settings.defaultBranch && settings.defaultBranch.trim()) {
+    const defaultBranchResult = validateBranchName(settings.defaultBranch);
+    if (!defaultBranchResult.valid) return defaultBranchResult;
   }
 
   return { valid: true };

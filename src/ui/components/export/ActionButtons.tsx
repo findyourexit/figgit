@@ -4,7 +4,7 @@
  * Primary export and commit action buttons.
  */
 
-import { h, Fragment, FunctionComponent } from 'preact';
+import { h, FunctionComponent } from 'preact';
 import { useCallback } from 'preact/hooks';
 import {
   Stack,
@@ -67,17 +67,14 @@ export const ActionButtons: FunctionComponent = () => {
 
       {commitState.success && !commitState.skipped && (
         <Banner variant="success" icon={<IconInfoSmall24 />}>
-          <Text>
-            Committed successfully!
+          <Stack space="extraSmall">
+            <Text>Committed successfully!</Text>
             {commitState.url && (
-              <>
-                {' '}
-                <a href={commitState.url} target="_blank" rel="noopener noreferrer">
-                  View commit →
-                </a>
-              </>
+              <a href={commitState.url} target="_blank" rel="noopener noreferrer">
+                View commit →
+              </a>
             )}
-          </Text>
+          </Stack>
         </Banner>
       )}
 
