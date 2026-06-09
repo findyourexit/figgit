@@ -2,7 +2,7 @@
  * Message type definitions for communication between UI and Plugin.
  *
  * This module defines the message protocol for postMessage-based communication
- * between the React UI (running in an iframe) and the plugin code (running in
+ * between the Preact UI (running in an iframe) and the plugin code (running in
  * the Figma sandbox). All messages are fully typed for compile-time safety.
  *
  * Communication is bidirectional:

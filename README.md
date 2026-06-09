@@ -5,7 +5,6 @@
 # FigGit
 
 [![CI Status](https://github.com/findyourexit/figgit/workflows/CI/badge.svg)](https://github.com/findyourexit/figgit/actions)
-[![Test Coverage](https://img.shields.io/badge/coverage-94.51%25-brightgreen)](https://github.com/findyourexit/figgit)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue)](https://www.typescriptlang.org/)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -125,7 +124,7 @@ Example DTCG export:
     "com.figma": {
       "exportedAt": "2025-01-15T10:30:00.000Z",
       "fileName": "Design System",
-      "pluginVersion": "0.2.0",
+      "pluginVersion": "0.3.1",
       "collectionsCount": 3,
       "variablesCount": 42,
       "contentHash": "sha256:a1b2c3..."
@@ -174,7 +173,7 @@ Example Figma-native export (per collection):
   "contentHash": "c19f6a...",
   "exportedAt": "2025-12-03T23:21:11.219Z",
   "fileName": "Katalyst Design System",
-  "pluginVersion": "0.2.0",
+  "pluginVersion": "0.3.1",
   "exportFormat": "figma-native",
   "exportType": "perCollection",
   "collectionId": "889:34",
@@ -357,7 +356,6 @@ Enable dry run to:
 - Test configuration without committing
 - Preview what would be committed
 - Verify diff calculation
-- Preserve last known hash state
 
 ### Automatic Branch Creation
 
