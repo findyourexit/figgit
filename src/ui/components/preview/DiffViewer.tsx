@@ -53,6 +53,16 @@ export const DiffViewer: FunctionComponent = () => {
     fetchRemoteData,
   ]);
 
+  // NOTE: hooks must run unconditionally and in a stable order on every render,
+  // so this memo is declared before any early return below.
+  const diffs = useMemo(() => {
+    if (!exportState.data) return [];
+    return exportState.data.documents.map((doc) => {
+      const remote = remoteDataState.files.find((file) => file.path === doc.relativePath);
+      return computeDocumentDiff(doc, remote);
+    });
+  }, [exportState.data, remoteDataState.files]);
+
   if (!exportState.data) {
     return (
       <Banner icon={<IconInfoSmall24 />}>
@@ -72,14 +82,6 @@ export const DiffViewer: FunctionComponent = () => {
       </Banner>
     );
   }
-
-  const diffs = useMemo(() => {
-    if (!exportState.data) return [];
-    return exportState.data.documents.map((doc) => {
-      const remote = remoteDataState.files.find((file) => file.path === doc.relativePath);
-      return computeDocumentDiff(doc, remote);
-    });
-  }, [exportState.data, remoteDataState.files]);
 
   const hasAnyChanges = diffs.some(
     (diff) =>
