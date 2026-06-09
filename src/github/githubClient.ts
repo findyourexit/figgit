@@ -46,6 +46,13 @@ export interface CommitFilesOptions {
   commitMessage: string;
   files: FileCommitPayload[];
   baseBranch?: string;
+  /**
+   * Pre-fetched embedded content hashes keyed by repo-relative path. When a
+   * path is present, its hash is used for change detection instead of issuing
+   * another contents request. Only supply hashes that are valid for the commit
+   * target branch.
+   */
+  knownContentHashes?: Record<string, string | null>;
 }
 
 export interface CommitFilesResult {
@@ -391,7 +398,8 @@ function extractEmbeddedHashFromJsonContent(content: string): string | undefined
 }
 
 export async function commitFiles(options: CommitFilesOptions): Promise<CommitFilesResult> {
-  const { owner, repo, branch, token, commitMessage, files, baseBranch } = options;
+  const { owner, repo, branch, token, commitMessage, files, baseBranch, knownContentHashes } =
+    options;
 
   if (!files.length) {
     return { updated: false, skipped: true, updatedPaths: [] };
@@ -399,7 +407,14 @@ export async function commitFiles(options: CommitFilesOptions): Promise<CommitFi
 
   await ensureBranch(owner, repo, branch, token, baseBranch);
 
-  const filesToUpdate = await filterFilesNeedingUpdate(owner, repo, branch, token, files);
+  const filesToUpdate = await filterFilesNeedingUpdate(
+    owner,
+    repo,
+    branch,
+    token,
+    files,
+    knownContentHashes
+  );
 
   if (!filesToUpdate.length) {
     return { updated: false, skipped: true, updatedPaths: [] };
@@ -516,27 +531,53 @@ async function filterFilesNeedingUpdate(
   repo: string,
   branch: string,
   token: string,
-  files: FileCommitPayload[]
+  files: FileCommitPayload[],
+  knownContentHashes?: Record<string, string | null>
 ): Promise<FileCommitPayload[]> {
   const updates: FileCommitPayload[] = [];
 
   for (const file of files) {
-    const existing = await getExistingFile(owner, repo, branch, file.path, token);
-    if (existing) {
-      try {
-        const decoded = fromBase64(existing.content);
-        const embeddedHash = extractEmbeddedHashFromJsonContent(decoded);
-        if (embeddedHash && embeddedHash === file.contentHash) {
-          continue;
-        }
-      } catch {
-        // Ignore parse errors and include file for update
-      }
+    const embeddedHash = await resolveEmbeddedHash(
+      owner,
+      repo,
+      branch,
+      token,
+      file.path,
+      knownContentHashes
+    );
+    if (embeddedHash && embeddedHash === file.contentHash) {
+      continue;
     }
     updates.push(file);
   }
 
   return updates;
+}
+
+/**
+ * Resolves the embedded content hash for a path, preferring a pre-fetched hash
+ * to avoid a redundant contents request.
+ */
+async function resolveEmbeddedHash(
+  owner: string,
+  repo: string,
+  branch: string,
+  token: string,
+  path: string,
+  knownContentHashes?: Record<string, string | null>
+): Promise<string | null | undefined> {
+  if (knownContentHashes && Object.prototype.hasOwnProperty.call(knownContentHashes, path)) {
+    return knownContentHashes[path];
+  }
+
+  const existing = await getExistingFile(owner, repo, branch, path, token);
+  if (!existing) return null;
+  try {
+    const decoded = fromBase64(existing.content);
+    return extractEmbeddedHashFromJsonContent(decoded);
+  } catch {
+    return undefined;
+  }
 }
 
 async function getHeadInfo(

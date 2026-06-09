@@ -196,6 +196,10 @@ async function handleCommitRequest(msg: CommitRequestMessage) {
       commitMessage,
       files,
       baseBranch,
+      // Reuse the hashes already fetched for the skip decision when they were
+      // read from the commit target branch, avoiding a second round of
+      // contents requests inside commitFiles.
+      knownContentHashes: diffBranch === targetBranch ? remoteHashes : undefined,
     });
 
     const nextHashes = { ...storedHashes };
