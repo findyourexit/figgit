@@ -225,6 +225,48 @@ describe('githubClient', () => {
     });
   });
 
+  describe('transient error retries', () => {
+    it('retries transient 5xx responses and eventually succeeds', async () => {
+      vi.useFakeTimers();
+      let attempts = 0;
+      const fetchMock = vi.fn(async () => {
+        attempts += 1;
+        if (attempts < 3) return jsonResponse(503, {});
+        return jsonResponse(200, { object: { sha: 'commit-main' } });
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const promise = branchExists('acme', 'tokens', 'main', 't');
+      await vi.runAllTimersAsync();
+      await expect(promise).resolves.toBe(true);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+
+      vi.useRealTimers();
+    });
+
+    it('gives up after the maximum number of attempts on persistent 5xx', async () => {
+      vi.useFakeTimers();
+      const fetchMock = vi.fn(async () => jsonResponse(503, {}));
+      vi.stubGlobal('fetch', fetchMock);
+
+      const settled = branchExists('acme', 'tokens', 'main', 't').catch((e) => e);
+      await vi.runAllTimersAsync();
+      const result = await settled;
+      expect(result).toBeInstanceOf(Error);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+
+      vi.useRealTimers();
+    });
+
+    it('does not retry non-transient statuses such as 404', async () => {
+      const fetchMock = vi.fn(async () => jsonResponse(404, {}));
+      vi.stubGlobal('fetch', fetchMock);
+
+      await expect(branchExists('acme', 'tokens', 'missing', 't')).resolves.toBe(false);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('commitFiles skip behaviour', () => {
     it('skips the commit when the embedded content hash already matches the remote file', async () => {
       // The remote file embeds the same contentHash, so no commit should happen.

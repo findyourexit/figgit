@@ -121,16 +121,31 @@ async function ghFetch(url: string, token: string, init: RequestInit = {}) {
 
   init.headers = { ...headers, ...(init.headers as Record<string, string>) };
 
-  // Retry network requests with exponential backoff
+  // Retry network requests with exponential backoff.
   return withRetry(
     async () => {
-      return await fetch(url, init);
+      const res = await fetch(url, init);
+      // Throw on transient statuses so withRetry retries them with backoff.
+      // Non-transient statuses (including 401/403/404/409/422) are returned
+      // so callers can inspect and handle them directly.
+      if (isTransientStatus(res.status)) {
+        throw new Error(`GitHub request failed with transient status ${res.status}`);
+      }
+      return res;
     },
     {
       maxAttempts: 3,
       initialDelay: 1000,
     }
   );
+}
+
+/**
+ * Returns true for HTTP statuses worth retrying: rate limiting (429) and
+ * transient server errors (5xx).
+ */
+function isTransientStatus(status: number): boolean {
+  return status === 429 || (status >= 500 && status <= 599);
 }
 
 export async function branchExists(
