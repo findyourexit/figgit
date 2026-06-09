@@ -6,11 +6,25 @@
  */
 
 import { h, FunctionComponent, createContext } from 'preact';
-import { useContext, useState, useEffect, useCallback } from 'preact/hooks';
+import { useContext, useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import { UIToPluginMessage, PluginToUIMessage, PersistedSettings } from '../../messaging';
 import { ExportBundle } from '../../types/export';
 
 export type NotificationType = 'success' | 'error' | 'warning' | 'info';
+
+/**
+ * Builds a signature of the settings that shape an export. When any of these
+ * change, the current export bundle is stale and must be regenerated so the
+ * preview, diff, and commit all use the new format/paths.
+ */
+function exportSignature(settings: PersistedSettings): string {
+  return [
+    settings.exportFormat || 'dtcg',
+    settings.exportType || 'singleFile',
+    settings.filename || '',
+    settings.folder || '',
+  ].join('|');
+}
 
 export interface ExportState {
   loading: boolean;
@@ -97,6 +111,7 @@ export const PluginProvider: FunctionComponent<PluginProviderProps> = ({ childre
     loading: false,
     files: [],
   });
+  const lastExportSignature = useRef<string | null>(null);
 
   const sendMessage = (message: UIToPluginMessage) => {
     parent.postMessage({ pluginMessage: message }, '*');
@@ -219,15 +234,26 @@ export const PluginProvider: FunctionComponent<PluginProviderProps> = ({ childre
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
-  // Auto-export when settings are loaded (eliminates UX friction)
+  // Auto-export on load and whenever an export-shaping setting changes
+  // (format, document strategy, filename, folder). A short debounce collapses
+  // rapid edits (such as typing a filename) into a single export.
   useEffect(() => {
-    if (settings && !exportState.loading && !exportState.data && !exportState.error) {
-      // Start export automatically in the background
-      setTimeout(() => {
-        setExportState({ loading: true });
-        sendMessage({ type: 'REQUEST_EXPORT' });
-      }, 100);
-    }
+    if (!settings || exportState.loading) return;
+
+    const signature = exportSignature(settings);
+    const signatureChanged = lastExportSignature.current !== signature;
+    // Export when there is no result yet, or when the inputs that shape the
+    // export have changed since the last export. Do not retry automatically
+    // after an error unless the inputs changed.
+    const needsExport = signatureChanged || (!exportState.data && !exportState.error);
+    if (!needsExport) return;
+
+    const timer = setTimeout(() => {
+      lastExportSignature.current = signature;
+      setExportState({ loading: true });
+      sendMessage({ type: 'REQUEST_EXPORT' });
+    }, 100);
+    return () => clearTimeout(timer);
   }, [settings, exportState.data, exportState.loading, exportState.error]);
 
   return (
