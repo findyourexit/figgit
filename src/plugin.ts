@@ -369,8 +369,6 @@ figma.ui.onmessage = async (msg: UIToPluginMessage) => {
     case 'FETCH_REMOTE_EXPORT':
       await handleFetchRemoteExport(msg.files);
       break;
-    case 'COPY_TO_CLIPBOARD':
-      break;
     case 'NOTIFY':
       figma.notify(msg.message, { error: msg.level === 'error' });
       break;
