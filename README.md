@@ -6,7 +6,7 @@
 
 [![CI Status](https://github.com/findyourexit/figgit/workflows/CI/badge.svg)](https://github.com/findyourexit/figgit/actions)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue)](https://www.typescriptlang.org/)
-![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)
+![Node](https://img.shields.io/badge/node-%3E%3D24-brightgreen)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 <!-- ![Version](https://img.shields.io/github/v/release/findyourexit/figgit) -->
 
@@ -230,7 +230,7 @@ Use **single-file** export when you want one consolidated JSON, or switch to **p
 ### Requirements
 
 - **Figma Desktop** (plugin API not available in browser version)
-- **Node.js 20+** (for building the plugin)
+- **Node.js 24+** (for building the plugin)
 - **GitHub Repository** with write access
 - **GitHub Personal Access Token** (fine-grained or classic with `repo` scope)
 
