@@ -29,20 +29,6 @@ interface GitHubFile {
   html_url: string;
 }
 
-/**
- * Result of a file upsert operation.
- */
-export interface UpsertResult {
-  /** True if file was created or updated */
-  updated: boolean;
-  /** True if operation was skipped due to identical content */
-  skipped: boolean;
-  /** GitHub HTML URL to view the file */
-  url?: string;
-  /** Git commit SHA if file was updated */
-  commitSha?: string;
-}
-
 export interface FileCommitPayload {
   /** File path within the repository */
   path: string;
@@ -68,30 +54,6 @@ export interface CommitFilesResult {
   updatedPaths: string[];
   url?: string;
   commitSha?: string;
-}
-
-/**
- * Options for upserting a file to GitHub.
- */
-export interface GitHubUpsertOptions {
-  /** GitHub username or organization name */
-  owner: string;
-  /** Repository name */
-  repo: string;
-  /** Target branch name */
-  branch: string;
-  /** File path within repository (e.g., 'folder/filename.json') */
-  path: string;
-  /** File content as raw string (will be Base64-encoded) */
-  content: string;
-  /** GitHub Personal Access Token */
-  token: string;
-  /** Commit message for the change */
-  commitMessage: string;
-  /** SHA-256 content hash for change detection (not Git blob hash) */
-  currentHash: string;
-  /** Optional base branch to create target branch from when missing */
-  baseBranch?: string;
 }
 
 /**
@@ -261,7 +223,7 @@ async function getExistingFile(
  * @param str - String to encode
  * @returns Base64-encoded string
  */
-function toBase64(str: string): string {
+export function toBase64(str: string): string {
   const base64Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
   // Convert UTF-16 string to UTF-8 bytes
@@ -426,125 +388,6 @@ function extractEmbeddedHashFromJsonContent(content: string): string | undefined
     // Ignore parse errors
   }
   return undefined;
-}
-
-/**
- * Creates or updates a file in a GitHub repository.
- *
- * Features:
- * - Automatically creates branch if it doesn't exist
- * - Detects if content has changed using content hash
- * - Skips commit if content is identical (idempotent)
- * - Automatically retries once on 409 conflicts
- * - Handles create and update in one operation
- *
- * Change detection:
- * 1. Fetches existing file (if any)
- * 2. Checks embedded meta.contentHash against current hash
- * 3. Skips commit if hashes match
- * 4. Otherwise, creates/updates file
- *
- * @param options - File upsert configuration
- * @returns Result indicating whether file was updated or skipped
- * @throws Error if unable to create/update file
- */
-export async function upsertFile(options: GitHubUpsertOptions): Promise<UpsertResult> {
-  const { owner, repo, branch, path, content, token, commitMessage, currentHash, baseBranch } =
-    options;
-
-  // Ensure target branch exists (create from default branch if needed)
-  await ensureBranch(owner, repo, branch, token, baseBranch);
-
-  // Check if file already exists
-  const existing = await getExistingFile(owner, repo, branch, path, token);
-
-  if (existing) {
-    try {
-      const decoded = fromBase64(existing.content);
-      const embeddedHash = extractEmbeddedHashFromJsonContent(decoded);
-
-      // If hashes match, content is identical - skip commit
-      if (embeddedHash && embeddedHash === currentHash) {
-        return { updated: false, skipped: true, url: existing.html_url };
-      }
-
-      // If no embedded hash (legacy file), proceed with update
-      // The hash will be added after first update
-    } catch {
-      // Ignore Base64 decoding errors - proceed with update
-    }
-  }
-
-  // Prepare commit payload
-  const body = {
-    message: commitMessage,
-    content: toBase64(content),
-    branch,
-    sha: existing ? existing.sha : undefined, // SHA required for updates
-  };
-
-  /**
-   * Attempts to write the file to GitHub.
-   *
-   * Handles 409 conflicts by refetching and retrying once.
-   * This handles race conditions where another process updated the file.
-   *
-   * @param prevExisting - Previously fetched file metadata
-   * @param attempt - Attempt number (0 = first try, 1 = retry)
-   * @returns Upsert result
-   */
-  async function attemptWrite(
-    prevExisting: GitHubFile | null,
-    attempt: number
-  ): Promise<UpsertResult> {
-    const putRes = await ghFetch(
-      `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`,
-      token,
-      {
-        method: 'PUT',
-        body: JSON.stringify({ ...body, sha: prevExisting ? prevExisting.sha : body.sha }),
-      }
-    );
-
-    // Handle 409 conflict (file was updated by someone else)
-    if (putRes.status === 409 && attempt === 0) {
-      // Refetch latest version and retry once
-      const latest = await getExistingFile(owner, repo, branch, path, token);
-
-      if (latest) {
-        // Before retrying, check if content is still identical
-        try {
-          const decoded = fromBase64(latest.content);
-          const embedded = extractEmbeddedHashFromJsonContent(decoded);
-
-          if (embedded && embedded === currentHash) {
-            // Content matches - someone else already committed the same change
-            return { updated: false, skipped: true, url: latest.html_url };
-          }
-        } catch {
-          // Ignore errors - proceed with retry
-        }
-      }
-
-      // Retry with latest SHA
-      return attemptWrite(latest, 1);
-    }
-
-    if (!putRes.ok) {
-      throw new Error(`Failed to write file: ${putRes.status}`);
-    }
-
-    const result = await putRes.json();
-    return {
-      updated: true,
-      skipped: false,
-      url: result.content?.html_url,
-      commitSha: result.commit?.sha,
-    };
-  }
-
-  // Start the write attempt
-  return attemptWrite(existing, 0);
 }
 
 export async function commitFiles(options: CommitFilesOptions): Promise<CommitFilesResult> {
