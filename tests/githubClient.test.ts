@@ -331,6 +331,55 @@ describe('githubClient', () => {
     });
   });
 
+  describe('commitFiles known content hashes', () => {
+    it('uses provided hashes and commits without re-reading file contents', async () => {
+      const { fetchMock, calls } = createFetchMock({
+        owner: 'acme',
+        repo: 'tokens',
+        existingBranches: ['main'],
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const result = await commitFiles({
+        owner: 'acme',
+        repo: 'tokens',
+        branch: 'main',
+        token: 't',
+        commitMessage: 'chore: export tokens',
+        files: [{ path: 'variables.json', content: '{}', contentHash: 'new-hash' }],
+        knownContentHashes: { 'variables.json': 'old-hash' },
+      });
+
+      expect(result.updated).toBe(true);
+      const contentReads = calls.filter((c) => c.method === 'GET' && c.url.includes('/contents/'));
+      expect(contentReads).toHaveLength(0);
+    });
+
+    it('skips via provided hashes without any contents request', async () => {
+      const { fetchMock, calls } = createFetchMock({
+        owner: 'acme',
+        repo: 'tokens',
+        existingBranches: ['main'],
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const result = await commitFiles({
+        owner: 'acme',
+        repo: 'tokens',
+        branch: 'main',
+        token: 't',
+        commitMessage: 'chore: export tokens',
+        files: [{ path: 'variables.json', content: '{}', contentHash: 'same-hash' }],
+        knownContentHashes: { 'variables.json': 'same-hash' },
+      });
+
+      expect(result.skipped).toBe(true);
+      expect(result.updated).toBe(false);
+      const contentReads = calls.filter((c) => c.method === 'GET' && c.url.includes('/contents/'));
+      expect(contentReads).toHaveLength(0);
+    });
+  });
+
   describe('commitFiles skip behaviour', () => {
     it('skips the commit when the embedded content hash already matches the remote file', async () => {
       // The remote file embeds the same contentHash, so no commit should happen.
