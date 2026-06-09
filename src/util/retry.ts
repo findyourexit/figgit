@@ -44,8 +44,9 @@ function defaultShouldRetry(error: Error, _attempt: number): boolean {
     return true;
   }
 
-  // Retry on 5xx server errors and 429 rate limiting
-  if (errorMsg.includes('50') || errorMsg.includes('429') || errorMsg.includes('rate limit')) {
+  // Retry on 5xx server errors and 429 rate limiting. Match whole status
+  // codes so unrelated numbers (e.g. "50" in a path) do not trigger retries.
+  if (/\b(5\d{2}|429)\b/.test(errorMsg) || errorMsg.includes('rate limit')) {
     return true;
   }
 
