@@ -11,6 +11,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildDtcgJson } from '../src/export/buildDtcgJson';
 import type { DtcgRoot } from '../src/shared/dtcg-types';
 import { isDtcgToken, isDtcgGroup } from '../src/shared/dtcg-types';
+import { PLUGIN_VERSION } from '../src/constants';
 
 // Type for mock Figma API
 interface MockFigmaApi {
@@ -123,7 +124,7 @@ describe('buildDtcgJson', () => {
     const metadata = result.$extensions!['com.figma'];
     expect(metadata).toHaveProperty('exportedAt');
     expect(metadata).toHaveProperty('fileName', 'Test Design System');
-    expect(metadata).toHaveProperty('pluginVersion');
+    expect(metadata).toHaveProperty('pluginVersion', PLUGIN_VERSION);
     expect(metadata).toHaveProperty('collectionsCount', 2);
     expect(metadata).toHaveProperty('variablesCount', 3);
     expect(metadata).toHaveProperty('contentHash');
