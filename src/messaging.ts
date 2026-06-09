@@ -24,7 +24,6 @@ import type { ExportBundle, ExportFormat, ExportType } from './types/export';
  * - VALIDATE_TOKEN: Test if stored token is valid
  * - COMMIT_REQUEST: Commit exported JSON to GitHub
  * - FETCH_REMOTE_EXPORT: Fetch existing JSON from GitHub for diff
- * - COPY_TO_CLIPBOARD: Copy text to system clipboard
  * - PING: Simple connectivity test
  */
 export type UIToPluginMessage =
@@ -41,7 +40,6 @@ export type UIToPluginMessage =
       commitPrefix: string;
     }
   | { type: 'FETCH_REMOTE_EXPORT'; files: string[] }
-  | { type: 'COPY_TO_CLIPBOARD'; text: string } // Copy text to clipboard
   | { type: 'NOTIFY'; level: 'info' | 'error'; message: string } // Display notification in Figma UI
   | { type: 'PING' };
 
