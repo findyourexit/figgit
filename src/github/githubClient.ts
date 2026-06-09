@@ -562,25 +562,71 @@ export async function commitFiles(options: CommitFilesOptions): Promise<CommitFi
     return { updated: false, skipped: true, updatedPaths: [] };
   }
 
-  const headInfo = await getHeadInfo(owner, repo, branch, token);
-
-  const treeEntries = [] as Array<{ path: string; mode: string; type: string; sha: string }>;
+  // Blobs are content-addressed and independent of the branch head, so they are
+  // created once and reused across conflict retries.
+  const treeEntries: Array<{ path: string; mode: string; type: string; sha: string }> = [];
   for (const file of filesToUpdate) {
     const blobSha = await createBlob(owner, repo, token, file.content);
     treeEntries.push({ path: file.path, mode: '100644', type: 'blob', sha: blobSha });
   }
 
-  const treeSha = await createTree(owner, repo, token, headInfo.treeSha, treeEntries);
-  const commit = await createCommit(owner, repo, token, commitMessage, treeSha, headInfo.commitSha);
-  await updateBranchRef(owner, repo, branch, token, commit.sha);
+  const commitSha = await commitTreeWithConflictRetry(
+    owner,
+    repo,
+    branch,
+    token,
+    commitMessage,
+    treeEntries
+  );
 
   return {
     updated: true,
     skipped: false,
     updatedPaths: filesToUpdate.map((file) => file.path),
-    url: `https://github.com/${owner}/${repo}/commit/${commit.sha}`,
-    commitSha: commit.sha,
+    url: `https://github.com/${owner}/${repo}/commit/${commitSha}`,
+    commitSha,
   };
+}
+
+/**
+ * Creates a tree and commit on the current branch HEAD, then fast-forwards the
+ * branch ref to the new commit.
+ *
+ * If the ref update fails because the branch advanced concurrently (a 409/422
+ * conflict), the branch HEAD is re-read and the commit is rebuilt on the new
+ * HEAD once before giving up. The (content-addressed) blobs are reused.
+ */
+async function commitTreeWithConflictRetry(
+  owner: string,
+  repo: string,
+  branch: string,
+  token: string,
+  commitMessage: string,
+  treeEntries: Array<{ path: string; mode: string; type: string; sha: string }>,
+  attempt = 0
+): Promise<string> {
+  const headInfo = await getHeadInfo(owner, repo, branch, token);
+  const treeSha = await createTree(owner, repo, token, headInfo.treeSha, treeEntries);
+  const commit = await createCommit(owner, repo, token, commitMessage, treeSha, headInfo.commitSha);
+
+  try {
+    await updateBranchRef(owner, repo, branch, token, commit.sha);
+    return commit.sha;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (attempt === 0 && /\b(409|422)\b/.test(message)) {
+      return commitTreeWithConflictRetry(
+        owner,
+        repo,
+        branch,
+        token,
+        commitMessage,
+        treeEntries,
+        attempt + 1
+      );
+    }
+    throw error;
+  }
 }
 
 export interface RemoteHashLookupOptions {
@@ -754,6 +800,6 @@ async function updateBranchRef(
     }
   );
   if (!res.ok) {
-    throw new Error('Failed to update branch reference');
+    throw new Error(`Failed to update branch reference: ${res.status}`);
   }
 }

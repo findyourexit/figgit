@@ -34,11 +34,13 @@ function createFetchMock(options: {
   defaultBranch?: string;
   existingBranches?: string[];
   existingFiles?: Record<string, { sha: string; content: string }>;
+  patchFailuresBeforeSuccess?: number;
 }) {
   const { owner, repo, defaultBranch = 'main' } = options;
   const branches = new Set(options.existingBranches ?? [defaultBranch]);
   const files = options.existingFiles ?? {};
   const calls: Array<{ method: string; url: string }> = [];
+  let patchCalls = 0;
 
   const base = `https://api.github.com/repos/${owner}/${repo}`;
 
@@ -101,6 +103,11 @@ function createFetchMock(options: {
 
     // Update branch ref: PATCH /git/refs/heads/<branch>
     if (method === 'PATCH' && u.includes('/git/refs/heads/')) {
+      patchCalls += 1;
+      if (patchCalls <= (options.patchFailuresBeforeSuccess ?? 0)) {
+        // 422 "Update is not a fast forward": the branch advanced concurrently.
+        return jsonResponse(422, { message: 'Update is not a fast forward' });
+      }
       return jsonResponse(200, {});
     }
 
@@ -264,6 +271,63 @@ describe('githubClient', () => {
 
       await expect(branchExists('acme', 'tokens', 'missing', 't')).resolves.toBe(false);
       expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('commitFiles conflict resolution', () => {
+    it('rebuilds the commit and retries once when the ref update conflicts', async () => {
+      const { fetchMock, calls } = createFetchMock({
+        owner: 'acme',
+        repo: 'tokens',
+        existingBranches: ['main'],
+        patchFailuresBeforeSuccess: 1,
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const result = await commitFiles({
+        owner: 'acme',
+        repo: 'tokens',
+        branch: 'main',
+        token: 't',
+        commitMessage: 'chore: export tokens',
+        files: [{ path: 'variables.json', content: '{}', contentHash: 'abc' }],
+      });
+
+      expect(result.updated).toBe(true);
+
+      // The ref update was attempted twice (conflict then success)...
+      const patchCount = calls.filter((c) => c.method === 'PATCH').length;
+      expect(patchCount).toBe(2);
+      // ...and the commit was rebuilt on the refreshed HEAD.
+      const commitCount = calls.filter(
+        (c) => c.method === 'POST' && c.url.endsWith('/git/commits')
+      ).length;
+      expect(commitCount).toBe(2);
+    });
+
+    it('surfaces the error when the conflict persists after one retry', async () => {
+      const { fetchMock, calls } = createFetchMock({
+        owner: 'acme',
+        repo: 'tokens',
+        existingBranches: ['main'],
+        patchFailuresBeforeSuccess: 5,
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      await expect(
+        commitFiles({
+          owner: 'acme',
+          repo: 'tokens',
+          branch: 'main',
+          token: 't',
+          commitMessage: 'chore: export tokens',
+          files: [{ path: 'variables.json', content: '{}', contentHash: 'abc' }],
+        })
+      ).rejects.toThrow(/update branch reference/i);
+
+      // Initial attempt + exactly one retry.
+      const patchCount = calls.filter((c) => c.method === 'PATCH').length;
+      expect(patchCount).toBe(2);
     });
   });
 
