@@ -13,6 +13,7 @@ import { SETTINGS_KEY, defaultSettings, UIToPluginMessage, PersistedSettings } f
 import { commitFiles, fromBase64, branchExists, getRemoteFileHashes } from './github/githubClient';
 import { stableStringify } from './util/stableStringify';
 import { buildRepoPath } from './util/path';
+import { resolveBaseBranch } from './util/branchPlan';
 import { validateAllSettings } from './util/validation';
 
 type CommitRequestMessage = Extract<UIToPluginMessage, { type: 'COMMIT_REQUEST' }>;
@@ -127,20 +128,27 @@ async function handleCommitRequest(msg: CommitRequestMessage) {
     const owner = settings.owner.trim();
     const repo = settings.repo.trim();
     const targetBranch = settings.branch.trim();
-    const fallbackBranch = settings.defaultBranch?.trim() || targetBranch;
+    // When no default branch is configured, `baseBranch` is undefined so the
+    // GitHub client falls back to the repository's actual default branch when
+    // creating the target branch.
+    const baseBranch = resolveBaseBranch(settings.defaultBranch);
+    const configuredDefault = baseBranch ?? '';
     const docPaths = Array.from(new Set(exportBundle.documents.map((doc) => doc.relativePath)));
 
     const targetExists = await branchExists(owner, repo, targetBranch, token);
 
     let diffBranch: string | null = targetBranch;
     if (!targetExists) {
-      if (fallbackBranch && fallbackBranch !== targetBranch) {
-        const fallbackExists = await branchExists(owner, repo, fallbackBranch, token);
+      if (configuredDefault && configuredDefault !== targetBranch) {
+        const fallbackExists = await branchExists(owner, repo, configuredDefault, token);
         if (!fallbackExists) {
-          throw new Error(`Default branch "${fallbackBranch}" not found in ${owner}/${repo}`);
+          throw new Error(`Default branch "${configuredDefault}" not found in ${owner}/${repo}`);
         }
-        diffBranch = fallbackBranch;
+        diffBranch = configuredDefault;
       } else {
+        // Target branch does not exist yet and no distinct default branch is
+        // configured. commitFiles will create it from the repository default,
+        // so there is nothing to diff against on the (missing) target branch.
         diffBranch = null;
       }
     }
@@ -187,7 +195,7 @@ async function handleCommitRequest(msg: CommitRequestMessage) {
       token,
       commitMessage,
       files,
-      baseBranch: fallbackBranch,
+      baseBranch,
     });
 
     const nextHashes = { ...storedHashes };
