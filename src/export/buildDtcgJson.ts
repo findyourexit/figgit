@@ -24,9 +24,7 @@ import {
 import { stableStringify } from '../util/stableStringify';
 import { sha256 } from './hash';
 import { normalizeModeValue } from './valueNormalization';
-
-/** Plugin version - can be replaced during build via define if desired */
-const PLUGIN_VERSION = '0.2.0';
+import { PLUGIN_VERSION } from '../constants';
 
 /**
  * Minimal shape for a collection mode to avoid implicit any.
