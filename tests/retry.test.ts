@@ -169,6 +169,22 @@ describe('withRetry', () => {
     expect(fn).toHaveBeenCalledTimes(2);
   });
 
+  it('should retry on 5xx server errors', async () => {
+    const fn = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('503 Service Unavailable'))
+      .mockResolvedValue('success');
+
+    const promise = withRetry(fn, { maxAttempts: 2, initialDelay: 100 });
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    const result = await promise;
+
+    expect(result).toBe('success');
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
   it('should respect custom shouldRetry', async () => {
     const fn = vi.fn().mockRejectedValue(new Error('Custom error'));
     const shouldRetry = vi.fn().mockReturnValue(false);
