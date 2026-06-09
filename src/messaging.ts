@@ -94,10 +94,6 @@ export interface PersistedSettings {
   commitPrefix?: string;
   /** Dry run mode - test without actually committing */
   dryRun?: boolean;
-  /** Last known content hash for change detection */
-  lastHash?: string;
-  /** Map of repo-relative file paths to last known content hashes */
-  lastHashes?: Record<string, string>;
   /** Preferred export format */
   exportFormat?: ExportFormat;
   /** Export type for figma-native format */
@@ -127,6 +123,5 @@ export function defaultSettings(): PersistedSettings {
     dryRun: false,
     exportFormat: 'dtcg',
     exportType: 'singleFile',
-    lastHashes: {},
   };
 }

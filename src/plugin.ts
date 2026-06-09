@@ -12,7 +12,6 @@ import { buildExportBundle } from './export/buildExportBundle';
 import { SETTINGS_KEY, defaultSettings, UIToPluginMessage, PersistedSettings } from './messaging';
 import { commitFiles, fromBase64, branchExists, getRemoteFileHashes } from './github/githubClient';
 import { stableStringify } from './util/stableStringify';
-import { buildRepoPath } from './util/path';
 import { resolveBaseBranch } from './util/branchPlan';
 import { validateAllSettings } from './util/validation';
 
@@ -123,8 +122,6 @@ async function handleCommitRequest(msg: CommitRequestMessage) {
       return;
     }
 
-    const storedHashes = getLastHashMap(settings);
-
     const owner = settings.owner.trim();
     const repo = settings.repo.trim();
     const targetBranch = settings.branch.trim();
@@ -200,17 +197,6 @@ async function handleCommitRequest(msg: CommitRequestMessage) {
       // read from the commit target branch, avoiding a second round of
       // contents requests inside commitFiles.
       knownContentHashes: diffBranch === targetBranch ? remoteHashes : undefined,
-    });
-
-    const nextHashes = { ...storedHashes };
-    for (const doc of exportBundle.documents) {
-      nextHashes[doc.relativePath] = doc.contentHash;
-    }
-
-    await saveSettings({
-      ...settings,
-      lastHashes: nextHashes,
-      lastHash: exportBundle.summary.contentHash,
     });
 
     figma.ui.postMessage({
@@ -315,15 +301,6 @@ function formatGitHubError(message: string): string {
   if (/409/.test(message)) return 'Conflict (branch updated)';
   if (/422/.test(message)) return 'Validation failed (check branch/path)';
   return message;
-}
-
-function getLastHashMap(settings: PersistedSettings): Record<string, string> {
-  const map = { ...(settings.lastHashes || {}) };
-  if (!Object.keys(map).length && settings.lastHash) {
-    const legacyPath = buildRepoPath(settings.folder, settings.filename);
-    map[legacyPath] = settings.lastHash;
-  }
-  return map;
 }
 
 figma.ui.onmessage = async (msg: UIToPluginMessage) => {
