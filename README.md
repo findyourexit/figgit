@@ -1,3 +1,5 @@
+
+
 <div align="center">
   <img src="assets/logo.png" alt="FigGit Logo" width="128"/>
 </div>
@@ -431,6 +433,9 @@ npm test:ui
 
 # Run tests with coverage
 npm test:coverage
+
+# Run determinism test
+npm run test:determinism
 
 # Type checking
 npm run type-check
