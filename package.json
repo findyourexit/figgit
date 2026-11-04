@@ -76,7 +76,7 @@
   "dependencies": {
     "@create-figma-plugin/ui": "^4.0.3",
     "@create-figma-plugin/utilities": "^4.0.3",
-    "preact": "^10.19.3"
+    "preact": "^11.0.0"
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": [
