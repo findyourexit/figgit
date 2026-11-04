@@ -55,7 +55,7 @@
     "@preact/preset-vite": "^2.9.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/user-event": "^14.6.1",
-    "@types/node": "^24.10.0",
+    "@types/node": "^26.0.0",
     "@typescript-eslint/eslint-plugin": "^8.46.3",
     "@typescript-eslint/parser": "^8.46.3",
     "@vitest/coverage-v8": "^4.0.7",
