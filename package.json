@@ -50,7 +50,7 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@figma/eslint-plugin-figma-plugins": "^0.16.1",
+    "@figma/eslint-plugin-figma-plugins": "^1.0.0",
     "@figma/plugin-typings": "1.103.0",
     "@preact/preset-vite": "^2.9.1",
     "@testing-library/jest-dom": "^6.9.1",
